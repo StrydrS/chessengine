@@ -40,7 +40,6 @@ void print_bitboard(U64 bitboard) {
     printf("\n");
   }
     printf("\n     a b c d e f g h\n\n");
-
     printf("     Bitboard: %llud\n\n", bitboard);
 }
 
@@ -122,6 +121,101 @@ U64 mask_king_attacks(int square) {
   if((bitboard << 1) & not_a_file) attacks |= (bitboard << 1);
   return attacks;
 }
+
+U64 mask_bishop_attacks(int square) {
+
+  U64 attacks = 0ULL;
+  
+  int rank, file;
+  int targetRank = square / 8;
+  int targetFile = square % 8;
+
+  //mask relevant bishop occupancy bits
+  for(rank = targetRank + 1, file = targetFile + 1; rank <= 6 && file <= 6; rank++, file++) attacks |= (1ULL << (rank * 8 + file));
+  for(rank = targetRank - 1, file = targetFile + 1; rank >= 1 && file <= 6; rank--, file++) attacks |= (1ULL << (rank * 8 + file));
+  for(rank = targetRank + 1, file = targetFile - 1; rank <= 6 && file >= 1; rank++, file--) attacks |= (1ULL << (rank * 8 + file));
+  for(rank = targetRank - 1, file = targetFile - 1; rank >= 1 && file >= 1; rank--, file--) attacks |= (1ULL << (rank * 8 + file));
+
+  return attacks; 
+}
+
+U64 bishop_attacks_otf(int square, U64 block) {
+
+  U64 attacks = 0ULL;
+  
+  int rank, file;
+  int targetRank = square / 8;
+  int targetFile = square % 8;
+
+  //mask relevant bishop occupancy bits
+  for(rank = targetRank + 1, file = targetFile + 1; rank <= 7 && file <= 7; rank++, file++) {
+    attacks |= (1ULL << (rank * 8 + file));
+    if((1ULL << (rank * 8 + file)) & block) break;
+  }
+
+  for(rank = targetRank - 1, file = targetFile + 1; rank >= 0 && file <= 7; rank--, file++) {
+    attacks |= (1ULL << (rank * 8 + file));
+    if((1ULL << (rank * 8 + file)) & block) break;
+  }
+
+  for(rank = targetRank + 1, file = targetFile - 1; rank <= 7 && file >= 0; rank++, file--) {
+    attacks |= (1ULL << (rank * 8 + file));
+    if((1ULL << (rank * 8 + file)) & block) break;
+  }
+
+  for(rank = targetRank - 1, file = targetFile - 1; rank >= 0 && file >= 0; rank--, file--) {
+    attacks |= (1ULL << (rank * 8 + file));
+    if((1ULL << (rank * 8 + file)) & block) break;
+  }
+
+  return attacks; 
+}
+
+U64 mask_rook_attacks(int square) { 
+  U64 attacks = 0ULL; 
+
+  int rank, file;
+  int targetRank = square / 8;
+  int targetFile = square % 8;
+  
+  for(rank = targetRank + 1; rank <=6; rank++) attacks |= (1ULL << (rank * 8 + targetFile));
+  for(rank = targetRank - 1; rank >=1; rank--) attacks |= (1ULL << (rank * 8 + targetFile));
+  for(file = targetFile + 1; file <=6; file++) attacks |= (1ULL << (targetRank * 8 + file));
+  for(file = targetFile - 1; file >=1; file--) attacks |= (1ULL << (targetRank * 8 + file));
+  
+  return attacks;
+}
+
+U64 rook_attacks_otf(int square, U64 block) { 
+  U64 attacks = 0ULL; 
+
+  int rank, file;
+  int targetRank = square / 8;
+  int targetFile = square % 8;
+  
+  for(rank = targetRank + 1; rank <=7; rank++) {
+    attacks |= (1ULL << (rank * 8 + targetFile));
+    if((1ULL << (rank * 8 + targetFile)) & block) break;
+  }
+
+  for(rank = targetRank - 1; rank >=0; rank--) {
+    attacks |= (1ULL << (rank * 8 + targetFile));
+    if((1ULL << (rank * 8 + targetFile)) & block) break;
+  }
+
+  for(file = targetFile + 1; file <=7; file++) {
+    attacks |= (1ULL << (targetRank * 8 + file));
+    if((1ULL << (targetRank * 8 + file)) & block) break;
+  }
+
+  for(file = targetFile - 1; file >=0; file--) {
+    attacks |= (1ULL << (targetRank * 8 + file));
+    if((1ULL << (targetRank * 8 + file)) & block) break;
+  }
+
+  return attacks;
+}
+
 /************ Initialize Leaper Piece Attacks ************/
 void init_leaper_attacks() {
   //loop over 64 board squares 
@@ -137,14 +231,24 @@ void init_leaper_attacks() {
     king_attacks[square] = mask_king_attacks(square);
   }
 }
+
 /************ Main Driver ************/
 int main() { 
   //init leaper piece attacks
   init_leaper_attacks(); 
-
-  for(int square = 0; square < 64; square++) { 
-    print_bitboard(king_attacks[square]);
-  }
   
+  //init occupancy bitboard
+  U64 block = 0ULL; 
+  set_bit(block, d7);
+  set_bit(block, a3);
+  set_bit(block, e3);
+  set_bit(block, d2);
+
+  print_bitboard(block);
+  //for(int square = 0; square < 64; square++) { 
+  //  print_bitboard(mask_rook_attacks(square));
+  //}
+  
+  print_bitboard(rook_attacks_otf(d3, block));
   return 0;
 }
