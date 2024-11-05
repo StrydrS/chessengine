@@ -22,7 +22,7 @@ enum {
 
 enum { white, black };
 
-enum {
+const char* square_coordinates[] = {
   "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
   "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
   "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6",
@@ -32,6 +32,7 @@ enum {
   "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
   "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1"
 };
+
 /************ Define Bit Macros ************/
 #define set_bit(bitboard, square) (bitboard |= (1ULL << square))
 #define get_bit(bitboard, square) (bitboard & (1ULL << square))
@@ -267,21 +268,32 @@ void init_leaper_attacks() {
   }
 }
 
+U64 set_occupancy(int index, int bits_in_mask, U64 attack_mask){
+  U64 occupancy = 0ULL;
+
+  //loop over the range of bits within attack mask
+  for(int i = 0; i < bits_in_mask; i++) {
+    int square = get_lsb_index(attack_mask);
+    pop_bit(attack_mask, square);
+
+    //make sure occupancy is on board
+    if(index & (1 << i)) occupancy |= (1ULL << square);
+  }
+  return occupancy;
+}
+
 /************ Main Driver ************/
 int main() { 
   //init leaper piece attacks
   init_leaper_attacks(); 
   
-  //init occupancy bitboard
-  U64 block = 0ULL; 
-  set_bit(block, d7);
-  set_bit(block, a3);
-  set_bit(block, e3);
-  set_bit(block, d2);
-  print_bitboard(block);
-
-  printf("index: %d\n", get_lsb_index(block));
-  
+  //mask piece attacks
+  U64 attack_mask = mask_bishop_attacks(e4);
+  for(int i = 0; i < 100; i++) {
+    print_bitboard(set_occupancy(i, count_bits(attack_mask), attack_mask));
+    getchar();
+  }
+  print_bitboard(attack_mask);
 
   return 0;
 }
