@@ -87,6 +87,29 @@ const U64 not_h_file = 9187201950435737471ULL;
 const U64 not_hg_file = 4557430888798830399ULL;
 const U64 not_ab_file = 18229723555195321596ULL;
 
+//relevant occupancy bit count for every square on board
+const int bishop_relevant_bits[64] = {
+  6, 5, 5, 5, 5, 5, 5, 6,
+  5, 5, 5, 5, 5, 5, 5, 5,
+  5, 5, 7, 7, 7, 7, 5, 5,
+  5, 5, 7, 9, 9, 7, 5, 5,
+  5, 5, 7, 9, 9, 7, 5, 5,
+  5, 5, 7, 7, 7, 7, 5, 5,
+  5, 5, 5, 5, 5, 5, 5, 5,
+  6, 5, 5, 5, 5, 5, 5, 6 
+};
+
+const int rook_relevant_bits[64] = {
+  12, 11, 11, 11, 11, 11, 11, 12,
+  11, 10, 10, 10, 10, 10, 10, 11,
+  11, 10, 10, 10, 10, 10, 10, 11,
+  11, 10, 10, 10, 10, 10, 10, 11,
+  11, 10, 10, 10, 10, 10, 10, 11,
+  11, 10, 10, 10, 10, 10, 10, 11,
+  11, 10, 10, 10, 10, 10, 10, 11,
+  12, 11, 11, 11, 11, 11, 11, 12
+};
+
 //pawn attack table [side][square]
 U64 pawn_attacks[2][64];
 //knight attack table[square]
@@ -283,17 +306,26 @@ U64 set_occupancy(int index, int bits_in_mask, U64 attack_mask){
 }
 
 /************ Main Driver ************/
+//pseudo random number state
+unsigned int state = 1804289383;
+
+//generate 32bit pseudo legal numbers
+unsigned int get_rand() {
+  //get current state
+  unsigned int num = state;
+
+  //XOR shift algorithm 
+  num ^= num << 13;
+  num ^= num >> 17;
+  num ^= num << 5;
+
+  state = num; 
+  return state;
+}
+
 int main() { 
   //init leaper piece attacks
   init_leaper_attacks(); 
   
-  //mask piece attacks
-  U64 attack_mask = mask_bishop_attacks(e4);
-  for(int i = 0; i < 100; i++) {
-    print_bitboard(set_occupancy(i, count_bits(attack_mask), attack_mask));
-    getchar();
-  }
-  print_bitboard(attack_mask);
-
   return 0;
 }
