@@ -22,11 +22,46 @@ enum {
 
 enum { white, black };
 
+enum {
+  "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
+  "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
+  "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6",
+  "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5",
+  "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4",
+  "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
+  "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
+  "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1"
+};
 /************ Define Bit Macros ************/
 #define set_bit(bitboard, square) (bitboard |= (1ULL << square))
 #define get_bit(bitboard, square) (bitboard & (1ULL << square))
 #define pop_bit(bitboard, square) (get_bit(bitboard, square) ? bitboard ^= (1ULL << square) : 0)
 
+//count bits within bitboard
+static inline int count_bits(U64 bitboard) {
+  //init bit count
+  int count = 0;
+  
+  //consecutively reset least significant first bit in bitboard
+  while(bitboard) {
+    count++;
+
+    bitboard &= bitboard - 1;
+  }
+
+  return count;
+}
+
+//get least significant first bit index 
+static inline int get_lsb_index(U64 bitboard) {
+  
+  if(bitboard){
+    //count trailing bits before lsb
+    return count_bits((bitboard &= -bitboard) -1);
+  } else {
+    return -1;
+  }
+}
 /************ Print Bitboard ************/
 void print_bitboard(U64 bitboard) {
   printf("\n");
@@ -243,12 +278,10 @@ int main() {
   set_bit(block, a3);
   set_bit(block, e3);
   set_bit(block, d2);
-
   print_bitboard(block);
-  //for(int square = 0; square < 64; square++) { 
-  //  print_bitboard(mask_rook_attacks(square));
-  //}
+
+  printf("index: %d\n", get_lsb_index(block));
   
-  print_bitboard(rook_attacks_otf(d3, block));
+
   return 0;
 }
