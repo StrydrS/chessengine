@@ -18,12 +18,16 @@ enum {
   a4, b4, c4, d4, e4, f4, g4, h4,
   a3, b3, c3, d3, e3, f3, g3, h3,
   a2, b2, c2, d2, e2, f2, g2, h2,
-  a1, b1, c1, d1, e1, f1, g1, h1
+  a1, b1, c1, d1, e1, f1, g1, h1, no_sq
 };
 
-enum { white, black };
+enum { P, N, B, R, Q, K, p, n, b, r, q, k };
+
+enum { white, black, both};
 
 enum { rook, bishop };
+
+enum { wk = 1, wq = 2, bk = 4, bq = 8};
 
 const char* square_coordinates[] = {
   "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
@@ -35,6 +39,31 @@ const char* square_coordinates[] = {
   "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
   "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1"
 };
+
+char ascii_pieces[12] = "PNBRQKpnbrqk";
+char *unicode_pieces[12]  = {"♙", "♘", "♗", "♖", "♕", "♕", "♟", "♞", "♝", "♜", "♛" ,"♚"};
+
+//convert ascii character pieces to encoded constants
+int char_pieces[] = {
+  ['P'] = P,
+  ['N'] = N,
+  ['B'] = B,
+  ['R'] = R,
+  ['Q'] = Q,
+  ['K'] = K,
+  ['p'] = p,
+  ['n'] = n,
+  ['b'] = b,
+  ['r'] = r,
+  ['q'] = q,
+  ['k'] = k
+};
+//define piece bitboards, occupancy bitboards, side to move, enpassant square
+U64 bitboards[12]; 
+U64 occupancy[3];
+int side = -1;
+int enpassant = no_sq;
+int castle;
 
 /************ Random Magic Numbers! ************/
 //pseudo random number state
@@ -74,9 +103,9 @@ U64 generate_magic_num() {
 }
 
 /************ Define Bit Macros ************/
-#define set_bit(bitboard, square) (bitboard |= (1ULL << square))
-#define get_bit(bitboard, square) (bitboard & (1ULL << square))
-#define pop_bit(bitboard, square) (get_bit(bitboard, square) ? bitboard ^= (1ULL << square) : 0)
+#define set_bit(bitboard, square) ((bitboard) |= (1ULL << (square)))
+#define get_bit(bitboard, square) ((bitboard) & (1ULL << (square)))
+#define pop_bit(bitboard, square) ((bitboard) &= ~(1ULL << (square)))
 
 //count bits within bitboard
 static inline int count_bits(U64 bitboard) {
@@ -603,17 +632,10 @@ void init_all() {
 int main() { 
   init_all(); 
   
-  U64 occupancy = 0ULL;
-  set_bit(occupancy, c5);
-  set_bit(occupancy, f2);
-  set_bit(occupancy, g7);
-  set_bit(occupancy, b2);
-  set_bit(occupancy, g5);
-  set_bit(occupancy, e2);
-  set_bit(occupancy, e7);
-  print_bitboard(occupancy);
-  print_bitboard(get_bishop_attacks(d4, occupancy));
-  print_bitboard(get_rook_attacks(d4, occupancy));
-
+  //set white pawn e2
+  set_bit(bitboards[P], e2);
+  print_bitboard(bitboards[P]);
+  printf("piece: %c\n", ascii_pieces[P]);
+  printf("piece: %s\n", unicode_pieces[char_pieces['K']]);
   return 0;
 }
