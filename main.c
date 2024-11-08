@@ -41,7 +41,7 @@ const char* square_coordinates[] = {
 };
 
 char ascii_pieces[12] = "PNBRQKpnbrqk";
-char *unicode_pieces[12]  = {"♙", "♘", "♗", "♖", "♕", "♕", "♟", "♞", "♝", "♜", "♛" ,"♚"};
+char *unicode_pieces[12]  = {"♙", "♘", "♗", "♖", "♕", "♔", "♟", "♞", "♝", "♜", "♛" ,"♚"};
 
 //convert ascii character pieces to encoded constants
 int char_pieces[] = {
@@ -61,7 +61,7 @@ int char_pieces[] = {
 //define piece bitboards, occupancy bitboards, side to move, enpassant square
 U64 bitboards[12]; 
 U64 occupancy[3];
-int side = -1;
+int side;
 int enpassant = no_sq;
 int castle;
 
@@ -148,6 +148,30 @@ void print_bitboard(U64 bitboard) {
     printf("     Bitboard: %llud\n\n", bitboard);
 }
 
+void print_board() {
+  for(int rank = 0; rank < 8; rank++) { 
+    for(int file= 0; file < 8; file++) { 
+      int square = rank * 8 + file;
+      //define piece variable
+      if(!file) printf(" %d ", 8 - rank);
+      int piece = -1;
+      
+      for(int bb_piece = P; bb_piece <= k; bb_piece++) {
+        if(get_bit(bitboards[bb_piece], square)) piece = bb_piece;
+      }
+      printf(" %s", (piece == -1) ? "." : unicode_pieces[piece]); 
+    }
+    printf("\n");
+  }
+  printf("\n    a b c d e f g h \n\n");
+
+  printf("    STM:      %s\n", (!side && (side != -1)) ? "white" : "black");
+  printf("    Enpassant:   %s\n", (enpassant != no_sq) ? square_coordinates[enpassant] : "no");
+  printf("    Castling:  %c%c%c%c\n\n", (castle & wk) ? 'K' : '-', 
+                                      (castle & wq) ? 'Q' : '-', 
+                                      (castle & bk) ? 'k' : '-',  
+                                      (castle & bq) ? 'q' : '-'); 
+}
 /************ Attacks ************/
 
 //not file constants
@@ -619,13 +643,10 @@ static inline U64 get_rook_attacks(int square, U64 occupancy) {
 
 /************ Init All ************/
 //init all variables
-
 void init_all() {
   init_leaper_attacks(); 
   init_slider_attacks(bishop);  
   init_slider_attacks(rook);
-  // now hardcoded
-  // init_magic_num();
 }
 
 /************ Main Driver ************/
@@ -633,9 +654,53 @@ int main() {
   init_all(); 
   
   //set white pawn e2
+  set_bit(bitboards[P], a2);
+  set_bit(bitboards[P], b2);
+  set_bit(bitboards[P], c2);
+  set_bit(bitboards[P], d2);
   set_bit(bitboards[P], e2);
-  print_bitboard(bitboards[P]);
-  printf("piece: %c\n", ascii_pieces[P]);
-  printf("piece: %s\n", unicode_pieces[char_pieces['K']]);
+  set_bit(bitboards[P], f2);
+  set_bit(bitboards[P], g2);
+  set_bit(bitboards[P], h2);
+  set_bit(bitboards[p], a7);
+  set_bit(bitboards[p], b7);
+  set_bit(bitboards[p], c7);
+  set_bit(bitboards[p], d7);
+  set_bit(bitboards[p], e7);
+  set_bit(bitboards[p], f7);
+  set_bit(bitboards[p], g7);
+  set_bit(bitboards[p], h7); 
+
+  set_bit(bitboards[b], f8);
+  set_bit(bitboards[b], c8);
+  set_bit(bitboards[B], c1);
+  set_bit(bitboards[B], f1);
+
+  set_bit(bitboards[R], a1);
+  set_bit(bitboards[R], h1);
+  set_bit(bitboards[r], a8);
+  set_bit(bitboards[r], h8);
+
+  set_bit(bitboards[q], d8);
+  set_bit(bitboards[Q], d1);
+  set_bit(bitboards[K], e1);
+  set_bit(bitboards[k], e8);
+  
+  set_bit(bitboards[N], g1);
+  set_bit(bitboards[N], b1);
+  set_bit(bitboards[n], b8);
+  set_bit(bitboards[n], g8);
+//  print_bitboard(bitboards[P]);
+  
+  side = black;
+  enpassant = e3;
+  castle |= wk;
+  castle |= wq;
+  castle |= bq;
+  print_board(); 
+  
+  for(int piece = P; piece <= k; piece++) { 
+    print_bitboard(bitboards[piece]);
+  }
   return 0;
 }
