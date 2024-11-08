@@ -703,7 +703,6 @@ void init_slider_attacks(int bishop) {
       }
     }
   }
-
 }
 
 static inline U64 get_bishop_attacks(int square, U64 occupancy) { 
@@ -725,6 +724,27 @@ static inline U64 get_rook_attacks(int square, U64 occupancy) {
   return rook_attacks[square][occupancy];
 }
 
+static inline U64 get_queen_attacks(int square, U64 occupancy) {
+  
+  U64 result = 0ULL;
+  U64 bishop_occupancy = occupancy;
+  U64 rook_occupancy = occupancy;
+
+  bishop_occupancy &= bishop_masks[square];
+  bishop_occupancy *= bishop_magic_nums[square];
+  bishop_occupancy >>= 64 - bishop_relevant_bits[square];
+
+  result = bishop_attacks[square][bishop_occupancy];
+
+  rook_occupancy &= rook_masks[square];
+  rook_occupancy *= rook_magic_nums[square];
+  rook_occupancy >>= 64 - rook_relevant_bits[square];
+
+  result |= rook_attacks[square][rook_occupancy];
+
+  return result;
+}
+
 /************ Init All ************/
 //init all variables
 void init_all() {
@@ -736,13 +756,10 @@ void init_all() {
 /************ Main Driver ************/
 int main() { 
   init_all(); 
-  
-  parse_fen(cmk_position);
-
-  print_board(); 
-  
-  print_bitboard(occupancy[white]);
-  print_bitboard(occupancy[black]);
-  print_bitboard(occupancy[both]);
+  U64 occupancy = 0ULL;
+  set_bit(occupancy, b6);
+  set_bit(occupancy, d6);
+  set_bit(occupancy, e3);
+  print_bitboard(get_queen_attacks(d4, occupancy));
   return 0;
 }
