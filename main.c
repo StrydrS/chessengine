@@ -11,7 +11,7 @@
 //FEN debug positions
 #define empty_board "8/8/8/8/8/8/8/8 w - - "
 #define start_position "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1 "
-#define tricky_position "r3k2r/pPppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPpBBPPP/R3K2R b Kk e3 0 1 "
+#define tricky_position "r3k2r/p11pqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPpBBPpP/R3K2R b Kk d4 0 1 "
 #define killer_position "rnbqkb1r/pp1p1pPp/8/2p1pP2/1P1P4/3P3P/P1P1P3/RNBQKBNR w KQkq e6 0 1"
 #define cmk_position "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 "
 
@@ -780,6 +780,36 @@ static inline void generate_moves() {
               }
             }
           }
+          // init pawn attacks bitboard
+          attacks = pawn_attacks[side][source_square] & occupancy[black];
+
+          //generate pawn capture moves
+          while(attacks) { 
+            //init target square
+            target_square = get_lsb_index(attacks); 
+            
+            if(source_square >= a7 && source_square <= h7){
+              //move into a move list (tbd)
+              printf("pawn capture promotion: %s%sq\n", square_coordinates[source_square], square_coordinates[target_square]);
+              printf("pawn capture promotion: %s%sr\n", square_coordinates[source_square], square_coordinates[target_square]);
+              printf("pawn capture promotion: %s%sb\n", square_coordinates[source_square], square_coordinates[target_square]);
+              printf("pawn capture promotion: %s%sn\n", square_coordinates[source_square], square_coordinates[target_square]);
+            } else {
+              printf("pawn capture: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
+            }
+              pop_bit(attacks, target_square); 
+          }
+
+          //generate enpassant captures
+          if(enpassant != no_sq) { 
+            U64 enpassant_attacks = pawn_attacks[side][source_square] & (1ULL << enpassant);
+
+            //make sure enpassant capture is available
+            if(enpassant_attacks) { 
+              int target_enpassant = get_lsb_index(enpassant_attacks);
+              printf("pawn enpassant capture: %s%s\n", square_coordinates[source_square], square_coordinates[target_enpassant]);
+            }
+          }
           pop_bit(bitboard, source_square);
         }
       }
@@ -809,6 +839,35 @@ static inline void generate_moves() {
                 
                 printf("double pawn push: %s%s\n", square_coordinates[source_square], square_coordinates[target_square + 8]);
               }
+            }
+          }
+          attacks = pawn_attacks[side][source_square] & occupancy[white];
+
+          //generate pawn capture moves
+          while(attacks) { 
+            //init target square
+            target_square = get_lsb_index(attacks); 
+            
+            if(source_square >= a2 && source_square <= h2){
+              //move into a move list (tbd)
+              printf("pawn capture promotion: %s%sq\n", square_coordinates[source_square], square_coordinates[target_square]);
+              printf("pawn capture promotion: %s%sr\n", square_coordinates[source_square], square_coordinates[target_square]);
+              printf("pawn capture promotion: %s%sb\n", square_coordinates[source_square], square_coordinates[target_square]);
+              printf("pawn capture promotion: %s%sn\n", square_coordinates[source_square], square_coordinates[target_square]);
+            } else {
+              printf("pawn capture: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
+            }
+              pop_bit(attacks, target_square); 
+          }
+
+          //generate enpassant captures
+          if(enpassant != no_sq) { 
+            U64 enpassant_attacks = pawn_attacks[side][source_square] & (1ULL << enpassant);
+
+            //make sure enpassant capture is available
+            if(enpassant_attacks) { 
+              int target_enpassant = get_lsb_index(enpassant_attacks);
+              printf("pawn enpassant capture: %s%s\n", square_coordinates[source_square], square_coordinates[target_enpassant]);
             }
           }
           pop_bit(bitboard, source_square);
