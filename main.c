@@ -1060,13 +1060,55 @@ void print_attacked(int side) {
 }
 
 /************ Main Driver ************/
+//binary move representation encoding                       hexadecimal constants
+//0000 0000 0000 0000 0011 1111 source square               0x3f
+//0000 0000 0000 1111 1100 0000 target square               0xfc0
+//0000 0000 1111 0000 0000 0000 piece                       0xf000
+//0000 1111 0000 0000 0000 0000 promoted piece              0xf0000
+//0001 0000 0000 0000 0000 0000 capture flag                0x100000
+//0010 0000 0000 0000 0000 0000 double pawn push flag       0x200000
+//0100 0000 0000 0000 0000 0000 enpassant capture flag      0x400000
+//1000 0000 0000 0000 0000 0000 castle flag                 0x800000
+
+//encode move macro 
+#define encode_move(source, target, piece, promoted, capture, dpp, enpassant, castle) \
+(source) | (target << 6) | (piece << 12) | (promoted << 16) | \
+(capture << 20) | (dpp << 21) | (enpassant << 22) | (castle << 23)\
+
+//define macros to extract items from move
+#define get_source(move) (move & 0x3f)
+#define get_target(move) ((move & 0xfc0) >> 6)
+#define get_piece(move) ((move & 0xf000) >> 12)
+#define get_promoted(move) ((move & 0xf0000) >> 16)
+#define get_capture(move) (move & 0x100000)
+#define get_dpp(move) (move & 0x200000)
+#define get_enpassant(move) (move & 0x400000)
+#define get_castle(move) (move & 0x800000)
+
 int main() { 
   init_all(); 
 
   parse_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPrBPPrP/R3K2R b KQkq - 0 1 ");
   print_board();
   
-  generate_moves();
-  
+  //create move
+  int move = encode_move(e7, e8, P, Q, 0, 0, 0, 0);
+  int source = get_source(move);
+  int target = get_target(move);
+  int piece = get_piece(move);
+  int promotedPiece = get_promoted(move);
+  int captureFlag = get_capture(move);
+  int dppFlag = get_dpp(move);
+  int enpassantFlag = get_enpassant(move);
+  int castleFlag = get_castle(move);
+
+  printf("source square: %s\n", square_coordinates[source]);
+  printf("target square: %s\n", square_coordinates[target]);
+  printf("piece: %s\n", unicode_pieces[piece]);
+  printf("promoted piece: %s\n", unicode_pieces[promotedPiece]);
+  printf("capture flag: %d\n", captureFlag);
+  printf("dpp flag: %d\n", dppFlag);
+  printf("enpassant flag: %d\n", enpassantFlag);
+  printf("castle flag: %d\n", castleFlag);
   return 0;
 }
