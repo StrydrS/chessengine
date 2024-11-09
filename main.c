@@ -753,13 +753,54 @@ void init_all() {
   init_slider_attacks(rook);
 }
 
+//is current given square attacked by the current given side
+static inline int is_attacked(int square, int side) { 
+
+  //attacked by pawns
+  if((side == white) && (pawn_attacks[black][square] & bitboards[P])) return 1; 
+  if((side == black) && (pawn_attacks[white][square] & bitboards[p])) return 1; 
+
+  //attacked by knights
+  if((knight_attacks[square]) & ((side == white) ? bitboards[N] : bitboards[n])) return 1;
+
+  //attacked by kings
+  if((king_attacks[square]) & ((side == white) ? bitboards[K] : bitboards[k])) return 1;
+
+  //attacked by bishops
+  if((get_bishop_attacks(square, occupancy[both])) & ((side == white) ? bitboards[B] : bitboards[b])) return 1;
+
+  //attacked by rook
+  if((get_rook_attacks(square, occupancy[both])) & ((side == white) ? bitboards[R] : bitboards[r])) return 1;
+
+  //attacked by queens
+  if((get_queen_attacks(square, occupancy[both])) & ((side == white) ? bitboards[Q] : bitboards[q])) return 1;
+
+  //by default, returns false
+  return 0;
+}
+
+//print attacked squares
+void print_attacked(int side) {
+
+  for(int rank = 0; rank < 8; rank++) {
+    for(int file = 0; file < 8; file++) { 
+      int square = rank * 8 + file;
+      if(!file) printf("  %d ", 8 - rank);
+      printf(" %d", (is_attacked(square, side)) ? 1 : 0);
+    }
+    printf("\n");
+  }
+   printf("\n     a b c d e f g h\n\n");
+}
+
 /************ Main Driver ************/
 int main() { 
   init_all(); 
-  U64 occupancy = 0ULL;
-  set_bit(occupancy, b6);
-  set_bit(occupancy, d6);
-  set_bit(occupancy, e3);
-  print_bitboard(get_queen_attacks(d4, occupancy));
+
+  parse_fen("8/8/8/3Q4/8/8/3q4/8 w - - ");
+  print_board();
+  print_bitboard(occupancy[both]);
+  print_attacked(white);
+  
   return 0;
 }
