@@ -745,6 +745,24 @@ static inline U64 get_queen_attacks(int square, U64 occupancy) {
   return result;
 }
 
+//generate all moves
+static inline void generate_moves() { 
+  //define initial variables
+  int source_square, target_square; 
+  U64 bitboard, attacks;
+
+  for(int piece = P; piece <= k; piece++) { 
+    bitboard = bitboards[piece]; 
+    //generate white pawn and white king castling moves
+    if(side == white) { 
+      
+    }
+    //generate black pawn and black king castling moves
+    if(side == white) { 
+      
+    }
+  }
+}
 /************ Init All ************/
 //init all variables
 void init_all() {
@@ -797,9 +815,8 @@ void print_attacked(int side) {
 int main() { 
   init_all(); 
 
-  parse_fen("8/8/8/3Q4/8/8/3q4/8 w - - ");
+  parse_fen(start_position);
   print_board();
-  print_bitboard(occupancy[both]);
   print_attacked(white);
   
   return 0;
