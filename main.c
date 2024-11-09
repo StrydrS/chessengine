@@ -939,11 +939,99 @@ static inline void generate_moves() {
            //squares between king and king's rook empty
           if((!get_bit(occupancy[both], b8)) & (!get_bit(occupancy[both], c8)) & (!get_bit(occupancy[both], d8))) {      
             //make sure king and the f8 square are not being attacked
-            if((!is_attacked(e8, white)) && !is_attacked(d8, white)) { 
-              printf("castling move: e8c8\n");
-            }
+            if((!is_attacked(e8, white)) && !is_attacked(d8, white)) printf("castling move: e8c8\n");
           }
         }
+      }
+    }
+
+    //generate knight moves
+    if((side == white) ? piece == N : piece == n){
+      while(bitboard) {
+        source_square = get_lsb_index(bitboard); 
+        attacks = knight_attacks[source_square] & ((side==white) ? ~occupancy[white] : ~occupancy[black]);
+        while(attacks) { 
+          target_square = get_lsb_index(attacks);
+          if(!get_bit(((side == white) ? occupancy[black] : occupancy[white]), target_square)) { 
+              printf("knight quiet move: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
+          } else {
+            printf("knight capture: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
+          }
+          pop_bit(attacks, target_square);
+        }
+        pop_bit(bitboard, source_square);
+      }
+    }
+
+    //generate bishop moves
+    if((side == white) ? piece == B : piece == b){
+      while(bitboard) {
+        source_square = get_lsb_index(bitboard); 
+        attacks = get_bishop_attacks(source_square, occupancy[both]) & ((side==white) ? ~occupancy[white] : ~occupancy[black]);
+        while(attacks) { 
+          target_square = get_lsb_index(attacks);
+          if(!get_bit(((side == white) ? occupancy[black] : occupancy[white]), target_square)) { 
+              printf("bishop quiet move: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
+          } else {
+            printf("bishop capture: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
+          }
+          pop_bit(attacks, target_square);
+        }
+        pop_bit(bitboard, source_square);
+      }
+    }
+
+    //generate rook moves 
+    if((side == white) ? piece == R : piece == r){
+      while(bitboard) {
+        source_square = get_lsb_index(bitboard); 
+        attacks = get_rook_attacks(source_square, occupancy[both]) & ((side==white) ? ~occupancy[white] : ~occupancy[black]);
+        while(attacks) { 
+          target_square = get_lsb_index(attacks);
+          if(!get_bit(((side == white) ? occupancy[black] : occupancy[white]), target_square)) { 
+              printf("rook quiet move: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
+          } else {
+            printf("rook capture: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
+          }
+          pop_bit(attacks, target_square);
+        }
+        pop_bit(bitboard, source_square);
+      }
+    }
+
+    //generate queen moves
+    if((side == white) ? piece == Q : piece == q){
+      while(bitboard) {
+        source_square = get_lsb_index(bitboard); 
+        attacks = get_queen_attacks(source_square, occupancy[both]) & ((side==white) ? ~occupancy[white] : ~occupancy[black]);
+        while(attacks) { 
+          target_square = get_lsb_index(attacks);
+          if(!get_bit(((side == white) ? occupancy[black] : occupancy[white]), target_square)) { 
+              printf("queen quiet move: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
+          } else {
+            printf("queen capture: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
+          }
+          pop_bit(attacks, target_square);
+        }
+        pop_bit(bitboard, source_square);
+      }
+    }
+
+    //generate king moves
+    if((side == white) ? piece == K : piece == k){
+      while(bitboard) {
+        source_square = get_lsb_index(bitboard); 
+        attacks = king_attacks[source_square] & ((side==white) ? ~occupancy[white] : ~occupancy[black]);
+        while(attacks) { 
+          target_square = get_lsb_index(attacks);
+          if(!get_bit(((side == white) ? occupancy[black] : occupancy[white]), target_square)) { 
+              printf("king quiet move: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
+          } else {
+            printf("king capture: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
+          }
+          pop_bit(attacks, target_square);
+        }
+        pop_bit(bitboard, source_square);
       }
     }
   }
