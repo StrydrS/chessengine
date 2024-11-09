@@ -10,8 +10,8 @@
 
 //FEN debug positions
 #define empty_board "8/8/8/8/8/8/8/8 w - - "
-#define start_position "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1 "
-#define tricky_position "r3k2r/pPppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPpBBPPP/R3K2R b Kk e3 0 1 "
+#define start_position "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 "
+#define tricky_position "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w Kk e3 0 1 "
 #define killer_position "rnbqkb1r/pp1p1pPp/8/2p1pP2/1P1P4/3P3P/P1P1P3/RNBQKBNR w KQkq e6 0 1"
 #define cmk_position "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 "
 
@@ -755,69 +755,14 @@ static inline void generate_moves() {
     bitboard = bitboards[piece]; 
     //generate white pawn and white king castling moves
     if(side == white) { 
-      if(piece==P) {
-        //loop over white pawns within white pawn bb
-        while(bitboard) {
-          source_square = get_lsb_index(bitboard);
-          target_square = source_square - 8;
-
-          //generate quiet pawn moves (does not take)
-          if(!(target_square < a8) && !get_bit(occupancy[both], target_square)) {
-            //pawn promotion
-            if(source_square >= a7 && source_square <= h7){
-              //move into a move list (tbd)
-              printf("pawn promotion: %s%sq\n", square_coordinates[source_square], square_coordinates[target_square]);
-              printf("pawn promotion: %s%sr\n", square_coordinates[source_square], square_coordinates[target_square]);
-              printf("pawn promotion: %s%sb\n", square_coordinates[source_square], square_coordinates[target_square]);
-              printf("pawn promotion: %s%sn\n", square_coordinates[source_square], square_coordinates[target_square]);
-            } else {
-              //one square ahead pawn move
-              printf("pawn push: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
-              //two square ahead pawn move
-              if((source_square >= a2 && source_square <= h2) && !get_bit(occupancy[both], target_square-8)) {
-                
-                printf("double pawn push: %s%s\n", square_coordinates[source_square], square_coordinates[target_square - 8]);
-              }
-            }
-          }
-          pop_bit(bitboard, source_square);
-        }
-      }
+      
     }
     //generate black pawn and black king castling moves
-    else {
-       if(piece==p) {
-        //loop over black pawns within black pawn bb
-        while(bitboard) {
-          source_square = get_lsb_index(bitboard);
-          target_square = source_square + 8;
-
-          //generate quiet pawn moves (does not take)
-          if(!(target_square > h1) && !get_bit(occupancy[both], target_square)) {
-            //pawn promotion
-            if(source_square >= a2 && source_square <= h2){
-              //move into a move list (tbd)
-              printf("pawn promotion: %s%sq\n", square_coordinates[source_square], square_coordinates[target_square]);
-              printf("pawn promotion: %s%sr\n", square_coordinates[source_square], square_coordinates[target_square]);
-              printf("pawn promotion: %s%sb\n", square_coordinates[source_square], square_coordinates[target_square]);
-              printf("pawn promotion: %s%sn\n", square_coordinates[source_square], square_coordinates[target_square]);
-            } else {
-              //one square ahead pawn move
-              printf("pawn push: %s%s\n", square_coordinates[source_square], square_coordinates[target_square]);
-              //two square ahead pawn move
-              if((source_square >= a7 && source_square <= h7) && !get_bit(occupancy[both], target_square+8)) {
-                
-                printf("double pawn push: %s%s\n", square_coordinates[source_square], square_coordinates[target_square + 8]);
-              }
-            }
-          }
-          pop_bit(bitboard, source_square);
-        }
-      }   
+    if(side == white) { 
+      
     }
   }
 }
-
 /************ Init All ************/
 //init all variables
 void init_all() {
@@ -870,10 +815,9 @@ void print_attacked(int side) {
 int main() { 
   init_all(); 
 
-  parse_fen(tricky_position);
+  parse_fen(start_position);
   print_board();
-  
-  generate_moves();
+  print_attacked(white);
   
   return 0;
 }
