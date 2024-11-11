@@ -872,6 +872,95 @@ void print_move_list(moves *move_list) {
   printf("\n\n    Total number of moves: %d\n\n", move_list->count);
 }
 
+enum { all_moves, only_captures };
+
+//make move on board
+static inline int make_move(int move, int move_flag) { 
+  //quiet moves
+  if(!move_flag) {
+    //preserve board state
+    copy_board();
+
+    //parse move
+    int source_square = get_source(move);
+    int target_square = get_target(move);
+    int piece = get_piece(move);
+    int promoted = get_promoted(move);
+    int capture = get_capture(move);
+    int dpp = get_dpp(move);
+    int enpass = get_enpassant(move);
+    int castling = get_castle(move);
+    
+    //move piece (only works for quiet moves)
+    pop_bit(bitboards[piece], source_square);
+    set_bit(bitboards[piece], target_square);
+    
+    //handling capture moves
+    if(capture) { 
+      int start_piece, end_piece;
+      if(side == white) { 
+        start_piece = p; 
+        end_piece = k;
+      } else {
+        start_piece = P;
+        start_piece = K;
+      }
+
+      for(int bb_piece = start_piece; bb_piece <= end_piece; bb_piece++) { 
+        //if piece on target square, remove it from corresponding bitboard
+        if(get_bit(bitboards[bb_piece], target_square)) {
+          pop_bit(bitboards[bb_piece], target_square);
+          break;
+        }
+        
+      }
+    }
+    //handle pawn promotion
+    if(promoted) {  
+      //erase pawn from target square
+      pop_bit(bitboards[(side == white) ? P : p], target_square);
+      //setup promoted piece on board
+      set_bit(bitboards[promoted], target_square);
+    }
+    //handle enpassant moves
+    if(enpass) { 
+      (side == white) ? pop_bit(bitboards[p], target_square + 8) : pop_bit(bitboards[p], target_square - 8);
+    }
+    enpassant = no_sq;
+    //handle double pawn push
+    if(dpp) { 
+      (side == white) ? (enpassant = target_square + 8) : (enpassant = target_square - 8);
+    }
+
+    if(castling) { 
+      switch(target_square) {
+        case c1:
+          pop_bit(bitboards[R], a1);
+          set_bit(bitboards[R], d1); 
+          break;
+        case g1:
+          pop_bit(bitboards[R], h1);
+          set_bit(bitboards[R], f1); 
+          break;
+        case c8:
+          pop_bit(bitboards[R], a8);
+          set_bit(bitboards[R], d8); 
+          break;
+        case g8:
+          pop_bit(bitboards[R], h8);
+          set_bit(bitboards[R], f8); 
+          break;
+      }
+    }
+
+  } else {
+    if(get_capture(move)) make_move(move, all_moves);
+    else return 0;
+  }
+
+}
+
+
 //generate all moves
 static inline void generate_moves(moves *move_list) { 
   //define initial variables
@@ -1163,22 +1252,26 @@ void print_attacked(int side) {
 int main() { 
   init_all(); 
   
-  parse_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
+ // parse_fen("r3k2r/p11pqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq c6 0 1");
+  parse_fen(tricky_position);
   print_board();
 
-  //preserve board state
-  copy_board();
-  parse_fen(empty_board); 
-  print_board();
-  
-  restore_board();
-
-  print_board();
-  
   moves move_list[1];
-  generate_moves(move_list);
-  print_move_list(move_list);
+  generate_moves(move_list); 
 
+  //loop over generated moves
+  for(int i = 0; i < move_list->count; i++) { 
+    int move = move_list->moves[i];
+    //preserve board state
+    copy_board(); 
 
+    make_move(move, all_moves);
+    print_board();
+    getchar();
+
+    restore_board();
+    print_board();
+    getchar();
+  }
   return 0;
 }
