@@ -9,7 +9,7 @@
 #define U64 unsigned long long
 
 //FEN debug positions
-#define empty_board "8/8/8/8/8/8/8/8 w - - "
+#define empty_board "8/8/8/8/8/8/8/8 b - - "
 #define start_position "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1 "
 #define tricky_position "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"
 #define killer_position "rnbqkb1r/pp1p1pPp/8/2p1pP2/1P1P4/3P3P/P1P1P3/RNBQKBNR w KQkq e6 0 1"
@@ -808,6 +808,25 @@ static inline int is_attacked(int square, int side) {
 #define get_enpassant(move) (move & 0x400000)
 #define get_castle(move) (move & 0x800000)
 
+//preserve board state
+#define copy_board()                            \
+  U64 bitboards_copy[12], occupancy_copy[3];    \
+  int side_copy, enpassant_copy, castle_copy;   \
+  memcpy(bitboards_copy, bitboards, 96);        \
+  memcpy(occupancy_copy, occupancy, 24);        \
+  side_copy = side;                             \
+  enpassant_copy = enpassant;                   \
+  castle_copy = castle;                         \
+
+#define restore_board()                         \
+  memcpy(bitboards, bitboards_copy, 96);        \
+  memcpy(occupancy, occupancy_copy, 24);        \
+  side = side_copy;                             \
+  enpassant = enpassant_copy;                   \
+  castle = castle_copy;                         \
+
+
+
 //move list structure
 typedef struct {
   int moves[256]; 
@@ -1139,17 +1158,27 @@ void print_attacked(int side) {
   }
    printf("\n     a b c d e f g h\n\n");
 }
-
 /************ Main Driver ************/
 
 int main() { 
   init_all(); 
   
-  parse_fen(tricky_position);
+  parse_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
   print_board();
+
+  //preserve board state
+  copy_board();
+  parse_fen(empty_board); 
+  print_board();
+  
+  restore_board();
+
+  print_board();
+  
   moves move_list[1];
   generate_moves(move_list);
   print_move_list(move_list);
+
 
   return 0;
 }
