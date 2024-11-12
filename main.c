@@ -874,6 +874,18 @@ void print_move_list(moves *move_list) {
 
 enum { all_moves, only_captures };
 
+//castling rights update contants
+const int castling_rights[64] =  {
+    7, 15, 15, 15,  3, 15, 15, 11,
+    15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15,
+    13, 15, 15, 15, 12, 15, 15, 14 
+};
+
 //make move on board
 static inline int make_move(int move, int move_flag) { 
   //quiet moves
@@ -952,7 +964,9 @@ static inline int make_move(int move, int move_flag) {
           break;
       }
     }
-
+    //handle update castling rights
+    castle &= castling_rights[source_square];
+    castle &= castling_rights[target_square];
   } else {
     if(get_capture(move)) make_move(move, all_moves);
     else return 0;
