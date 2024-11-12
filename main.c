@@ -34,9 +34,26 @@ enum { white, black, both};
 
 enum { rook, bishop };
 
+/*
+
+    bin  dec
+    
+   0001    1  white king can castle to the king side
+   0010    2  white king can castle to the queen side
+   0100    4  black king can castle to the king side
+   1000    8  black king can castle to the queen side
+
+   examples
+
+   1111       both sides an castle both directions
+   1001       black king => queen side
+              white king => king side
+
+*/
+
 enum { wk = 1, wq = 2, bk = 4, bq = 8};
 
-const char* square_coordinates[] = {
+const char *square_coordinates[] = {
   "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
   "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
   "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6",
@@ -67,16 +84,17 @@ int char_pieces[] = {
 };
 
 char promoted_pieces[] = { 
-         [Q] = 'q', 
-         [R] = 'r',
-         [B] = 'b',
-         [N] = 'n',
-         [q] = 'q', 
-         [r] = 'r',
-         [b] = 'b',
-         [n] = 'n',
+  [Q] = 'q', 
+  [R] = 'r',
+  [B] = 'b',
+  [N] = 'n',
+  [q] = 'q', 
+  [r] = 'r',
+  [b] = 'b',
+  [n] = 'n',
 };
 
+/************ Board Variables ************/
 //define piece bitboards, occupancy bitboards, side to move, enpassant square
 U64 bitboards[12]; 
 U64 occupancy[3];
@@ -85,6 +103,7 @@ int enpassant = no_sq;
 int castle;
 
 /************ Random Magic Numbers! ************/
+//from Tord Romstad's proposal to find magic numbers
 //pseudo random number state
 unsigned int rand_state = 1804289383;
 
@@ -103,7 +122,6 @@ unsigned int get_randU32() {
 }
 
 //generate 64bity pseudo legal numbers
-//from Tord Romstad's proposal to find magic numbers
 U64 get_randU64() {
   //define 4 random numbers
   U64 n1, n2, n3, n4;
@@ -128,13 +146,11 @@ U64 generate_magic_num() {
 
 //count bits within bitboard
 static inline int count_bits(U64 bitboard) {
-  //init bit count
   int count = 0;
   
   //consecutively reset least significant first bit in bitboard
   while(bitboard) {
     count++;
-
     bitboard &= bitboard - 1;
   }
 
@@ -142,16 +158,14 @@ static inline int count_bits(U64 bitboard) {
 }
 
 //get least significant first bit index 
-static inline int get_lsb_index(U64 bitboard) {
-  
+static inline int get_lsb_index(U64 bitboard) { 
   if(bitboard){
     //count trailing bits before lsb
     return count_bits((bitboard &= -bitboard) -1);
-  } else {
-    return -1;
-  }
+  } else return -1;
 }
-/************ Print Bitboard ************/
+
+/************ Input/Output ************/
 void print_bitboard(U64 bitboard) {
   printf("\n");
   
@@ -168,6 +182,7 @@ void print_bitboard(U64 bitboard) {
 }
 
 void print_board() {
+  printf("\n");
   for(int rank = 0; rank < 8; rank++) { 
     for(int file= 0; file < 8; file++) { 
       int square = rank * 8 + file;
@@ -187,9 +202,9 @@ void print_board() {
   printf("    STM:      %s\n", (!side && (side != -1)) ? "white" : "black");
   printf("    Enpassant:   %s\n", (enpassant != no_sq) ? square_coordinates[enpassant] : "no");
   printf("    Castling:  %c%c%c%c\n\n", (castle & wk) ? 'K' : '-', 
-                                      (castle & wq) ? 'Q' : '-', 
-                                      (castle & bk) ? 'k' : '-',  
-                                      (castle & bq) ? 'q' : '-'); 
+                                        (castle & wq) ? 'Q' : '-', 
+                                        (castle & bk) ? 'k' : '-',  
+                                        (castle & bq) ? 'q' : '-'); 
 }
 
 void parse_fen(char *fen) { 
@@ -268,6 +283,7 @@ void parse_fen(char *fen) {
   occupancy[both] |= occupancy[white];
   occupancy[both] |= occupancy[black];
 }
+
 /************ Attacks ************/
 
 //not file constants
@@ -434,6 +450,10 @@ U64 bishop_magic_nums[64] = {
   0x4010011029020020ULL
 };
 
+//pawn attack table [side][square], //king, knight, bishop, rook attack table[square]
+U64 pawn_attacks[2][64];
+U64 knight_attacks[64];
+U64 king_attacks[64];
 U64 bishop_masks[64];
 U64 rook_masks[64];
 
@@ -441,15 +461,7 @@ U64 rook_masks[64];
 U64 bishop_attacks[64][512];
 U64 rook_attacks[64][4096];
 
-//pawn attack table [side][square]
-U64 pawn_attacks[2][64];
-//knight attack table[square]
-U64 knight_attacks[64];
-//king attack table[square]
-U64 king_attacks[64];
-
 U64 mask_pawn_attacks(int side, int square) {
-  
   //result attacks bitboard
   U64 attacks = 0ULL; 
 
@@ -765,19 +777,19 @@ static inline int is_attacked(int square, int side) {
   if((side == black) && (pawn_attacks[white][square] & bitboards[p])) return 1; 
 
   //attacked by knights
-  if((knight_attacks[square]) & ((side == white) ? bitboards[N] : bitboards[n])) return 1;
-
-  //attacked by kings
-  if((king_attacks[square]) & ((side == white) ? bitboards[K] : bitboards[k])) return 1;
+  if(knight_attacks[square] & ((side == white) ? bitboards[N] : bitboards[n])) return 1;
 
   //attacked by bishops
-  if((get_bishop_attacks(square, occupancy[both])) & ((side == white) ? bitboards[B] : bitboards[b])) return 1;
+  if(get_bishop_attacks(square, occupancy[both]) & ((side == white) ? bitboards[B] : bitboards[b])) return 1;
 
   //attacked by rook
-  if((get_rook_attacks(square, occupancy[both])) & ((side == white) ? bitboards[R] : bitboards[r])) return 1;
+  if(get_rook_attacks(square, occupancy[both]) & ((side == white) ? bitboards[R] : bitboards[r])) return 1;
 
   //attacked by queens
-  if((get_queen_attacks(square, occupancy[both])) & ((side == white) ? bitboards[Q] : bitboards[q])) return 1;
+  if(get_queen_attacks(square, occupancy[both]) & ((side == white) ? bitboards[Q] : bitboards[q])) return 1;
+
+  //attacked by kings
+  if(king_attacks[square] & ((side == white) ? bitboards[K] : bitboards[k])) return 1;
 
   //by default, returns false
   return 0;
@@ -787,6 +799,7 @@ static inline int is_attacked(int square, int side) {
 //print attacked squares
 void print_attacked(int side) {
 
+  printf("\n");
   for(int rank = 0; rank < 8; rank++) {
     for(int file = 0; file < 8; file++) { 
       int square = rank * 8 + file;
@@ -822,25 +835,6 @@ void print_attacked(int side) {
 #define get_dpp(move) (move & 0x200000)
 #define get_enpassant(move) (move & 0x400000)
 #define get_castle(move) (move & 0x800000)
-
-//preserve board state
-#define copy_board()                            \
-  U64 bitboards_copy[12], occupancy_copy[3];    \
-  int side_copy, enpassant_copy, castle_copy;   \
-  memcpy(bitboards_copy, bitboards, 96);        \
-  memcpy(occupancy_copy, occupancy, 24);        \
-  side_copy = side;                             \
-  enpassant_copy = enpassant;                   \
-  castle_copy = castle;                         \
-
-#define restore_board()                         \
-  memcpy(bitboards, bitboards_copy, 96);        \
-  memcpy(occupancy, occupancy_copy, 24);        \
-  side = side_copy;                             \
-  enpassant = enpassant_copy;                   \
-  castle = castle_copy;                         \
-
-
 
 //move list structure
 typedef struct {
@@ -887,6 +881,23 @@ void print_move_list(moves *move_list) {
   printf("\n\n    Total number of moves: %d\n\n", move_list->count);
 }
 
+//preserve board state
+#define copy_board()                            \
+  U64 bitboards_copy[12], occupancy_copy[3];    \
+  int side_copy, enpassant_copy, castle_copy;   \
+  memcpy(bitboards_copy, bitboards, 96);        \
+  memcpy(occupancy_copy, occupancy, 24);        \
+  side_copy = side;                             \
+  enpassant_copy = enpassant;                   \
+  castle_copy = castle;                         \
+
+#define restore_board()                         \
+  memcpy(bitboards, bitboards_copy, 96);        \
+  memcpy(occupancy, occupancy_copy, 24);        \
+  side = side_copy;                             \
+  enpassant = enpassant_copy;                   \
+  castle = castle_copy;                         \
+
 enum { all_moves, only_captures };
 
 //castling rights update contants
@@ -930,7 +941,7 @@ static inline int make_move(int move, int move_flag) {
         end_piece = k;
       } else {
         start_piece = P;
-        start_piece = K;
+        end_piece = K;
       }
 
       for(int bb_piece = start_piece; bb_piece <= end_piece; bb_piece++) { 
@@ -979,6 +990,7 @@ static inline int make_move(int move, int move_flag) {
           break;
       }
     }
+
     //handle update castling rights
     castle &= castling_rights[source_square];
     castle &= castling_rights[target_square];
@@ -998,7 +1010,7 @@ static inline int make_move(int move, int move_flag) {
     occupancy[both] |= occupancy[black];
 
     //change side
-    side ^= black;
+    side ^= 1;
 
     //make sure the king isn't in check
     if(is_attacked((side == white) ? get_lsb_index(bitboards[k]) : get_lsb_index(bitboards[K]) , side)) { 
@@ -1013,7 +1025,6 @@ static inline int make_move(int move, int move_flag) {
   }
 return 0;
 }
-
 
 //generate all moves
 static inline void generate_moves(moves *move_list) { 
@@ -1096,7 +1107,7 @@ static inline void generate_moves(moves *move_list) {
         //queen side castle is available
         if(castle & wq) {
            //squares between king and king's rook empty
-          if((!get_bit(occupancy[both], b1)) && (!get_bit(occupancy[both], c1)) && (!get_bit(occupancy[both], d1))) {      
+          if((!get_bit(occupancy[both], d1)) && (!get_bit(occupancy[both], c1)) && (!get_bit(occupancy[both], b1))) {      
             //make sure king and the f1 square are not being attacked
             if((!is_attacked(e1, black)) && !is_attacked(d1, black)) { 
               add_move(move_list, encode_move(e1, c1, piece, 0, 0, 0, 0, 1));
@@ -1144,7 +1155,7 @@ static inline void generate_moves(moves *move_list) {
               add_move(move_list, encode_move(source_square, target_square, piece, b, 1, 0, 0, 0));
               add_move(move_list, encode_move(source_square, target_square, piece, n, 1, 0, 0, 0));
             } else {
-                add_move(move_list, encode_move(source_square, target_square, piece, 0, 1, 0, 0, 0));
+              add_move(move_list, encode_move(source_square, target_square, piece, 0, 1, 0, 0, 0));
             }
               pop_bit(attacks, target_square); 
           }
@@ -1168,9 +1179,9 @@ static inline void generate_moves(moves *move_list) {
         //king side castle is available
         if(castle & bk) {
           //squares between king and king's rook empty
-          if((!get_bit(occupancy[both], f8)) && (!get_bit(occupancy[both], g8))) {
+          if(!get_bit(occupancy[both], f8) && !get_bit(occupancy[both], g8)) {
             //make sure king and the f1 square are not being attacked
-            if((!is_attacked(e8, white)) && !is_attacked(f8, white)) { 
+            if(!is_attacked(e8, white) && !is_attacked(f8, white)) { 
               add_move(move_list, encode_move(e8, g8, piece, 0, 0, 0, 0, 1));
             }
           }
@@ -1178,9 +1189,9 @@ static inline void generate_moves(moves *move_list) {
         //queen side castle is available
         if(castle & bq) {
            //squares between king and king's rook empty
-          if((!get_bit(occupancy[both], b8)) && (!get_bit(occupancy[both], c8)) && (!get_bit(occupancy[both], d8))) {      
+          if(!get_bit(occupancy[both], d8) && !get_bit(occupancy[both], c8) && !get_bit(occupancy[both], b8)) {  
             //make sure king and the f8 square are not being attacked
-            if((!is_attacked(e8, white)) && !is_attacked(d8, white)) {
+            if(!is_attacked(e8, white) && !is_attacked(d8, white)) {
               add_move(move_list, encode_move(e8, c8, piece, 0, 0, 0, 0, 1));
             }
           }
@@ -1321,20 +1332,20 @@ static inline void perft_driver(int depth) {
     perft_driver(depth - 1);
     restore_board();
   }
-
 }
+
 /************ Main Driver ************/
 
 int main() { 
   init_all(); 
   
   //parse_fen("r3k2r/p11pqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBqPPP/R3K2R w KQkq c6 0 1");
-  parse_fen(tricky_position);
+  parse_fen(start_position);
   print_board();
   
   int start = get_time_ms();
 
-  perft_driver(2);
+  perft_driver(6);
 
   //time taken to exec prog
   printf("time taken to exec prog: %d ms\n", get_time_ms() - start);
