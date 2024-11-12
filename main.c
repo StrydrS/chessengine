@@ -11,11 +11,11 @@
 
 //FEN debug positions
 #define empty_board "8/8/8/8/8/8/8/8 b - - "
-#define start_position "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1 "
+#define start_position "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 "
 #define tricky_position "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 "
 #define killer_position "rnbqkb1r/pp1p1pPp/8/2p1pP2/1P1P4/3P3P/P1P1P3/RNBQKBNR w KQkq e6 0 1"
 #define cmk_position "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 "
-
+#define new_pos "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 "
 /************ Board Squares ************/
 enum {
   a8, b8, c8, d8, e8, f8, g8, h8,
@@ -1291,14 +1291,7 @@ static inline void generate_moves(moves *move_list) {
   }
 }
 
-/************ Init All ************/
-//init all variables
-void init_all() {
-  init_leaper_attacks(); 
-  init_slider_attacks(bishop);  
-  init_slider_attacks(rook);
-}
-
+/************ Perft Testing ************/
 int get_time_ms() { 
   //get time in ms
   struct timeval time;
@@ -1334,21 +1327,66 @@ static inline void perft_driver(int depth) {
   }
 }
 
+//perftest
+void perft_test(int depth) { 
+  
+  printf("\nPerformance Test\n");
+  moves move_list[1];
+  generate_moves(move_list); 
+  long start = get_time_ms();
+
+  //loop over generated moves
+  for(int i = 0; i < move_list->count; i++) { 
+    //preserve board state
+    copy_board(); 
+
+    if(!make_move(move_list->moves[i], all_moves)) continue;
+
+    //cumulative nodes
+    long cumulative_nodes = nodes; 
+
+    //call perft driver recursively
+    perft_driver(depth - 1);
+
+    //old nodes
+    long old_nodes = nodes - cumulative_nodes;
+
+    restore_board();
+
+    printf("move: %s%s%c  nodes: %ld\n", square_coordinates[get_source(move_list->moves[i])], 
+                                         square_coordinates[get_target(move_list->moves[i])],
+                                         promoted_pieces[get_promoted(move_list->moves[i])],
+                                         old_nodes);
+  }
+
+  printf("\nDepth: %d", depth);
+  printf("\nNodes: %ld", nodes);
+  printf("\nTime: %ld", get_time_ms() - start);
+
+
+}
+
+/************ Init All ************/
+//init all variables
+void init_all() {
+  init_leaper_attacks(); 
+  init_slider_attacks(bishop);  
+  init_slider_attacks(rook);
+}
+
 /************ Main Driver ************/
 
 int main() { 
   init_all(); 
   
   //parse_fen("r3k2r/p11pqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBqPPP/R3K2R w KQkq c6 0 1");
-  parse_fen(start_position);
+  parse_fen(new_pos);
   print_board();
   
   int start = get_time_ms();
 
-  perft_driver(6);
-
+  //perft_driver(5);
+  perft_test(7);
   //time taken to exec prog
-  printf("time taken to exec prog: %d ms\n", get_time_ms() - start);
-  printf("number of nodes: %ld\n", nodes);
   return 0;
 }
