@@ -1366,6 +1366,43 @@ void perft_test(int depth) {
 
 }
 
+/************ UCI ************/
+//parse user/GUI move string input (ex. e7e8q)
+int parse_move(char *move_string) { 
+  moves move_list[1];
+  generate_moves(move_list);
+  
+  int source_square = (move_string[0] - 'a') + (8 - (move_string[1] - '0')) * 8;
+  int target_square = (move_string[2] - 'a') + (8 - (move_string[3] - '0')) * 8;
+
+  for(int i = 0; i < move_list->count; i++) { 
+    int move = move_list->moves[i];
+
+    //make sure source & target squares are available within the generated move
+    if(source_square == get_source(move) && target_square == get_target(move)) { 
+      int promoted_piece = get_promoted(move);
+      printf("promoted_piece: %d", promoted_piece);
+      if(promoted_piece) {      
+        if((promoted_piece == Q || promoted_piece == q) && move_string[4] == 'q') { 
+          return move;
+        } else if((promoted_piece == R || promoted_piece == r) && move_string[4] == 'r') {
+          return move; 
+        } else if((promoted_piece == B || promoted_piece == b) && move_string[4] == 'b') {
+          return move; 
+        } else if((promoted_piece == N || promoted_piece == n) && move_string[4] == 'n') {
+          return move; 
+        }
+        //loop on possible wrong promotion (ex. e7e8p, e7e8k, etc.) 
+        continue;
+      }
+      return move;
+    }
+  }
+
+  //return illegal move 
+  return 0;
+}
+
 /************ Init All ************/
 //init all variables
 void init_all() {
@@ -1379,14 +1416,22 @@ void init_all() {
 int main() { 
   init_all(); 
   
-  //parse_fen("r3k2r/p11pqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBqPPP/R3K2R w KQkq c6 0 1");
-  parse_fen(new_pos);
+  parse_fen("r3k2r/pPppqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBPPPP/R3K2R w KQkq c6 0 1 ");
+  //parse_fen(tricky_position);
   print_board();
   
-  int start = get_time_ms();
+  int move = parse_move("d5c6");
+
+  if(move) { 
+    make_move(move, all_moves);
+    print_board();
+  } else {
+    printf("illegal move\n");
+  }
+  //int start = get_time_ms();
 
   //perft_driver(5);
-  perft_test(7);
+  //perft_test(6);
   //time taken to exec prog
   return 0;
 }
