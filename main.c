@@ -852,7 +852,7 @@ static inline void add_move(moves *move_list, int move) {
 
 //print move
 void print_move(int move) { 
-  printf("%s%s%c\n", square_coordinates[get_source(move)], 
+  printf("%s%s%c", square_coordinates[get_source(move)], 
                      square_coordinates[get_target(move)],
                      promoted_pieces[get_promoted(move)]);
 }
@@ -1494,11 +1494,62 @@ static inline int evaluate() {
 }
 /************ Search Position ************/
 
-void search_position(int depth) { 
-  //best move placeholder
-  printf("bestmove d2d4\n");
+//half move counter
+int ply;
+int best_move; 
+
+//negamax alpha beta search
+static inline int negamax(int alpha, int beta, int depth) { 
+  
+  //recursion escape condition
+  if(depth == 0) return evaluate();
+  nodes++; 
+  
+  int current_best;
+  int old_alpha = alpha;
+
+  moves move_list[1]; 
+  generate_moves(move_list);
+
+  //loop over moves within movelist
+  for(int i = 0; i < move_list->count; i++) {
+    copy_board();
+    ply++;
+    
+    //if illegal move
+    if(make_move(move_list->moves[i], all_moves) == 0) { 
+      ply--;
+      continue;
+    }
+
+    //score current move
+    int score = -negamax(-beta, -alpha, depth - 1);
+    ply--;
+    restore_board();
+
+    //fail-hard beta cutoff (node (move) fails high)
+    if(score >= beta) return beta;
+    //found a better move (PV node)
+    if(score > alpha) {
+      alpha = score;
+      //if root move, associate best move with best score
+      if(ply==0) current_best = move_list->moves[i];
+    }
+  }
+
+  if(old_alpha != alpha) best_move = current_best;
+  //node fails low
+  return alpha;
+
 }
 
+void search_position(int depth) { 
+  //find best move within a given position (using negamax algorithm)
+  int score = negamax(-50000, 50000, depth);
+  printf("bestmove ");
+  print_move(best_move);
+  printf("\n");
+}
 
 /************ UCI ************/
 //parse user/GUI move string input (ex. e7e8q)
@@ -1638,12 +1689,12 @@ void init_all() {
 int main() { 
   init_all(); 
   
-  int debug = 1;
+  int debug = 0;
   
   if(debug) { 
-    parse_fen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1 ");
+    parse_fen(start_position);
     print_board(); 
-    printf("score: %d\n", evaluate());
+    search_position(1);
   } else uci_loop();
   return 0;
 }
