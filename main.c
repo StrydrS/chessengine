@@ -3,6 +3,7 @@
 // use as you wish 
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
 
@@ -1366,6 +1367,15 @@ void perft_test(int depth) {
 
 }
 
+/************ Search Position ************/
+
+void search_position(int depth) { 
+
+  //best move placeholder
+  printf("bestmove d2d4\n");
+}
+
+
 /************ UCI ************/
 //parse user/GUI move string input (ex. e7e8q)
 int parse_move(char *move_string) { 
@@ -1381,7 +1391,6 @@ int parse_move(char *move_string) {
     //make sure source & target squares are available within the generated move
     if(source_square == get_source(move) && target_square == get_target(move)) { 
       int promoted_piece = get_promoted(move);
-      printf("promoted_piece: %d", promoted_piece);
       if(promoted_piece) {      
         if((promoted_piece == Q || promoted_piece == q) && move_string[4] == 'q') { 
           return move;
@@ -1412,8 +1421,86 @@ void parse_position(char *command) {
   char *current_char = command;
   
   if(strncmp(command, "startpos", 8) == 0) parse_fen(start_position);
-  else printf("in here");
+  else { 
+    current_char = strstr(command, "fen");
+    if(current_char == NULL) { 
+      parse_fen(start_position);
+    } else {
+      current_char += 4;
+      parse_fen(current_char);
+    }
+  }
+  current_char = strstr(command, "moves");
+  if(current_char != NULL) { 
+    current_char += 6; 
+    //loop over moves within move string
+    while(*current_char) { 
+      int move = parse_move(current_char);
+      if(move == 0) break; 
+      make_move(move, all_moves);
+
+      //move current char pointer to end of current move
+      while(*current_char && *current_char != ' ') current_char++;
+
+      //go to the next move
+      current_char++;
+    }
+  }
+  print_board();
 }
+
+//parse UCI "go" command, ex. "go depth 6"
+void parse_go(char *command) { 
+  int depth = -1;
+  char *current_depth = NULL;
+  if((current_depth = strstr(command, "depth"))) depth = atoi(current_depth + 6);
+  
+  //different time controls placeholder 
+  else {
+    depth = 6;
+  }
+  search_position(depth);
+}
+
+// GUI -> isready   
+// readyok <-Engine 
+// GUI -> ucinewgame
+// "handshake" protocol within UCI
+
+void uci_loop() { 
+  //reset stdin & stdout buffers
+  setbuf(stdin, NULL);
+  setbuf(stdout, NULL);
+
+  //define USER/GUI input buff(large for FEN strings and move strings"
+  char input[2000];
+
+  printf("id name ce\n");
+  printf("author name Strydr Silverberg\n");
+  printf("uciok\n");
+
+  //main "game" loop
+  while(1) { 
+    memset(input, 0, sizeof(input));
+    fflush(stdout);
+    if(!fgets(input, 2000, stdin)) continue;
+    if(input[0] == '\n') continue;
+    if(!strncmp(input, "isready", 7)) {
+      printf("readyok\n");
+      continue;
+    }
+    else if(!strncmp(input, "position", 8)) parse_position(input);
+    else if(!strncmp(input, "ucinewgame", 10)) parse_position("position startpos");
+    else if(!strncmp(input, "go", 2)) parse_go(input);
+    else if(!strncmp(input, "quit", 4)) break;
+    else if(!strncmp(input, "uci", 3)) {
+      printf("id name ce\n");
+      printf("author name Strydr Silverberg\n");
+      printf("uciok\n");
+    }
+  }
+}
+
 /************ Init All ************/
 //init all variables
 void init_all() {
@@ -1427,18 +1514,7 @@ void init_all() {
 int main() { 
   init_all(); 
   
-  //parse_fen("r3k2r/pPppqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBPPPP/R3K2R w KQkq c6 0 1 ");
-  parse_fen(tricky_position);
-  print_board();
-  
-  //parse_position("position startpos");
-
-  print_board();
-  int start = get_time_ms();
-
-  //perft_driver(5);
-  perft_test(6);
-  //time taken to exec prog
+  uci_loop();
   
   return 0;
 }
