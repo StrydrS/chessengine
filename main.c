@@ -1403,6 +1403,17 @@ int parse_move(char *move_string) {
   return 0;
 }
 
+//parse UCI position command
+void parse_position(char *command) { 
+  //shift pointer to the right where the next token begins
+  command += 9;
+
+  //init pointer to current character in command string
+  char *current_char = command;
+  
+  if(strncmp(command, "startpos", 8) == 0) parse_fen(start_position);
+  else printf("in here");
+}
 /************ Init All ************/
 //init all variables
 void init_all() {
@@ -1416,22 +1427,18 @@ void init_all() {
 int main() { 
   init_all(); 
   
-  parse_fen("r3k2r/pPppqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBPPPP/R3K2R w KQkq c6 0 1 ");
-  //parse_fen(tricky_position);
+  //parse_fen("r3k2r/pPppqpb1/bn2pnp1/2pPN3/1p2P3/2N2Q1p/PPPBPPPP/R3K2R w KQkq c6 0 1 ");
+  parse_fen(tricky_position);
   print_board();
   
-  int move = parse_move("d5c6");
+  //parse_position("position startpos");
 
-  if(move) { 
-    make_move(move, all_moves);
-    print_board();
-  } else {
-    printf("illegal move\n");
-  }
-  //int start = get_time_ms();
+  print_board();
+  int start = get_time_ms();
 
   //perft_driver(5);
-  //perft_test(6);
+  perft_test(6);
   //time taken to exec prog
+  
   return 0;
 }
