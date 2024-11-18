@@ -43,13 +43,8 @@ This project is a chess engine implemented in C. It includes functionality for p
    ```
    cd chessengine
    ```
-3. Compile the program:
+3. Compile and run the program:
    ```
-   gcc -o chessengine main.c
+   make && ./main
    ```
-4. Run the engine:
-   ```
-   ./chessengine
-   ```
-
 This README provides an overview of the chess engine project, detailing its features, main functions, and instructions on how to run the engine. For further details, you can refer to the source code in the `main.c` file.
