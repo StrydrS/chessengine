@@ -1505,6 +1505,8 @@ static inline int negamax(int alpha, int beta, int depth) {
   if(depth == 0) return evaluate();
   nodes++; 
   
+  int check_state = is_attacked((side == white) ? get_lsb_index(bitboards[K]) : get_lsb_index(bitboards[k]), side ^ 1);
+  int legal_moves = 0;
   int current_best;
   int old_alpha = alpha;
 
@@ -1522,6 +1524,9 @@ static inline int negamax(int alpha, int beta, int depth) {
       continue;
     }
 
+    //increment legal moves
+    legal_moves++;
+
     //score current move
     int score = -negamax(-beta, -alpha, depth - 1);
     ply--;
@@ -1537,6 +1542,12 @@ static inline int negamax(int alpha, int beta, int depth) {
     }
   }
 
+  if(legal_moves == 0) {
+    //king is in check
+    if(check_state) return -49000 + ply;
+    else return 0;
+  }
+
   if(old_alpha != alpha) best_move = current_best;
   //node fails low
   return alpha;
@@ -1546,6 +1557,7 @@ static inline int negamax(int alpha, int beta, int depth) {
 void search_position(int depth) { 
   //find best move within a given position (using negamax algorithm)
   int score = negamax(-50000, 50000, depth);
+  
   printf("bestmove ");
   print_move(best_move);
   printf("\n");
@@ -1566,7 +1578,7 @@ int parse_move(char *move_string) {
     //make sure source & target squares are available within the generated move
     if(source_square == get_source(move) && target_square == get_target(move)) { 
       int promoted_piece = get_promoted(move);
-      if(promoted_piece) {      
+      if(promoted_piece) {  
         if((promoted_piece == Q || promoted_piece == q) && move_string[4] == 'q') { 
           return move;
         } else if((promoted_piece == R || promoted_piece == r) && move_string[4] == 'r') {
@@ -1632,7 +1644,7 @@ void parse_go(char *command) {
   
   //different time controls placeholder 
   else {
-    depth = 6;
+    depth = 5;
   }
   search_position(depth);
 }
@@ -1694,7 +1706,7 @@ int main() {
   if(debug) { 
     parse_fen(start_position);
     print_board(); 
-    search_position(1);
+    search_position(5);
   } else uci_loop();
   return 0;
 }
