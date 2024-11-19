@@ -1025,7 +1025,6 @@ static inline int make_move(int move, int move_flag) {
     if(get_capture(move)) make_move(move, all_moves);
     else return 0;
   }
-return 0;
 }
 
 //generate all moves
@@ -1540,6 +1539,7 @@ static inline int negamax(int alpha, int beta, int depth) {
   
   //recursion escape condition
   if(depth == 0) return quiescence(alpha, beta);
+  
   nodes++; 
   
   int check_state = is_attacked((side == white) ? get_lsb_index(bitboards[K]) : get_lsb_index(bitboards[k]), side ^ 1);
@@ -1745,7 +1745,7 @@ int main() {
   if(debug) { 
     parse_fen("r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 ");
     print_board(); 
-    search_position(2);
+    search_position(1);
   } else uci_loop();
   return 0;
 }
