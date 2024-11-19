@@ -17,6 +17,7 @@
 #define killer_position "rnbqkb1r/pp1p1pPp/8/2p1pP2/1P1P4/3P3P/P1P1P3/RNBQKBNR w KQkq e6 0 1"
 #define cmk_position "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 "
 #define new_pos "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 "
+
 /************ Board Squares ************/
 enum {
   a8, b8, c8, d8, e8, f8, g8, h8,
@@ -1498,11 +1499,47 @@ static inline int evaluate() {
 int ply;
 int best_move; 
 
+static inline int quiescence(int alpha, int beta) { 
+  
+  nodes++;
+
+  int eval = evaluate();
+  if(eval >= beta) return beta;
+    //found a better move (PV node)
+  if(eval > alpha) alpha = eval;
+
+  moves move_list[1]; 
+  generate_moves(move_list);
+
+  //loop over moves within movelist
+  for(int i = 0; i < move_list->count; i++) {
+    copy_board();
+    ply++;
+    
+    //if illegal move
+    if(make_move(move_list->moves[i], only_captures) == 0) { 
+      ply--;
+      continue;
+    }
+
+       //score current move
+    int score = -quiescence(-beta, -alpha);
+    ply--;
+    restore_board();
+
+    //fail-hard beta cutoff (node (move) fails high)
+    if(score >= beta) return beta;
+    //found a better move (PV node)
+    if(score > alpha) alpha = score;
+  }
+  return alpha;
+}
+
 //negamax alpha beta search
 static inline int negamax(int alpha, int beta, int depth) { 
   
   //recursion escape condition
-  if(depth == 0) return evaluate();
+  if(depth == 0) return quiescence(alpha, beta);
   nodes++; 
   
   int check_state = is_attacked((side == white) ? get_lsb_index(bitboards[K]) : get_lsb_index(bitboards[k]), side ^ 1);
@@ -1557,10 +1594,12 @@ static inline int negamax(int alpha, int beta, int depth) {
 void search_position(int depth) { 
   //find best move within a given position (using negamax algorithm)
   int score = negamax(-50000, 50000, depth);
-  
-  printf("bestmove ");
-  print_move(best_move);
-  printf("\n");
+  if(best_move) { 
+    printf("info score cp %d depth %d nodes %ld\n", score, depth, nodes);
+    printf("bestmove ");
+    print_move(best_move);
+    printf("\n");
+  }
 }
 
 /************ UCI ************/
@@ -1701,12 +1740,12 @@ void init_all() {
 int main() { 
   init_all(); 
   
-  int debug = 0;
+  int debug = 1;
   
   if(debug) { 
-    parse_fen(start_position);
+    parse_fen("r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 ");
     print_board(); 
-    search_position(5);
+    search_position(2);
   } else uci_loop();
   return 0;
 }
