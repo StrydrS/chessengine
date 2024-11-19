@@ -1492,11 +1492,74 @@ static inline int evaluate() {
   //return final evaluation based on side
   return (side == white) ? score : -score;
 }
+
 /************ Search Position ************/
+/*
+                          
+    (Victims) Pawn Knight Bishop   Rook  Queen   King
+  (Attackers)
+        Pawn   105    205    305    405    505    605
+      Knight   104    204    304    404    504    604
+      Bishop   103    203    303    403    503    603
+        Rook   102    202    302    402    502    602
+       Queen   101    201    301    401    501    601
+        King   100    200    300    400    500    600
+
+*/
+
+// MVV LVA [attacker][victim]
+static int mvv_lva[12][12] = {
+ 	105, 205, 305, 405, 505, 605,  105, 205, 305, 405, 505, 605,
+	104, 204, 304, 404, 504, 604,  104, 204, 304, 404, 504, 604,
+	103, 203, 303, 403, 503, 603,  103, 203, 303, 403, 503, 603,
+	102, 202, 302, 402, 502, 602,  102, 202, 302, 402, 502, 602,
+	101, 201, 301, 401, 501, 601,  101, 201, 301, 401, 501, 601,
+	100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600,
+
+	105, 205, 305, 405, 505, 605,  105, 205, 305, 405, 505, 605,
+	104, 204, 304, 404, 504, 604,  104, 204, 304, 404, 504, 604,
+	103, 203, 303, 403, 503, 603,  103, 203, 303, 403, 503, 603,
+	102, 202, 302, 402, 502, 602,  102, 202, 302, 402, 502, 602,
+	101, 201, 301, 401, 501, 601,  101, 201, 301, 401, 501, 601,
+	100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600
+};
 
 //half move counter
 int ply;
 int best_move; 
+
+static inline int score_move(int move) { 
+  
+  if(get_capture(move)) { 
+      int target_piece = P;
+      int start_piece, end_piece;
+      if(side == white) { start_piece = p; end_piece = k; } 
+      else { start_piece = P; end_piece = K; }
+
+      for(int bb_piece = start_piece; bb_piece <= end_piece; bb_piece++) { 
+        //if piece on target square, remove it from corresponding bitboard
+        if(get_bit(bitboards[bb_piece], get_target(move))) {
+          target_piece = bb_piece;
+          break;
+        }
+        
+      }
+    return mvv_lva[get_piece(move)][target_piece];
+  } else { 
+    
+  }
+
+  return 0;
+}
+
+void print_move_scores(moves *move_list) { 
+      printf("Move Scores\n\n");
+      for(int i = 0; i < move_list->count; i++) { 
+      printf("    move: "); 
+      print_move(move_list->moves[i]);
+      printf(" score: %d\n", score_move(move_list->moves[i]));
+    }
+}
 
 static inline int quiescence(int alpha, int beta) { 
   
@@ -1743,9 +1806,15 @@ int main() {
   int debug = 1;
   
   if(debug) { 
-    parse_fen("r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 ");
+    parse_fen(tricky_position);
     print_board(); 
-    search_position(1);
+    
+    moves move_list[1];
+    generate_moves(move_list);
+
+    print_move_scores(move_list);
+ 
+    //search_position(3);
   } else uci_loop();
   return 0;
 }
