@@ -1598,6 +1598,8 @@ static inline int quiescence(int alpha, int beta) {
   moves move_list[1]; 
   generate_moves(move_list);
 
+  sort_moves(move_list);
+
   //loop over moves within movelist
   for(int i = 0; i < move_list->count; i++) {
     copy_board();
@@ -1631,6 +1633,9 @@ static inline int negamax(int alpha, int beta, int depth) {
   nodes++; 
   
   int check_state = is_attacked((side == white) ? get_lsb_index(bitboards[K]) : get_lsb_index(bitboards[k]), side ^ 1);
+  
+  //increase search depth if king is in check 
+  if(check_state) depth++;
   int legal_moves = 0;
   int current_best;
   int old_alpha = alpha;
@@ -1638,6 +1643,7 @@ static inline int negamax(int alpha, int beta, int depth) {
   moves move_list[1]; 
   generate_moves(move_list);
 
+  sort_moves(move_list);
   //loop over moves within movelist
   for(int i = 0; i < move_list->count; i++) {
     copy_board();
@@ -1833,14 +1839,13 @@ int main() {
   if(debug) { 
     parse_fen(tricky_position);
     print_board(); 
-    
-    moves move_list[1];
-    generate_moves(move_list);
+    search_position(6);
+   // moves move_list[1];
+    //generate_moves(move_list);
 
-    sort_moves(move_list);
+    //sort_moves(move_list);
 
-    print_move_scores(move_list);
-    //search_position(3);
+    //print_move_scores(move_list);
   } else uci_loop();
   return 0;
 }
