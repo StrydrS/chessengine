@@ -1552,13 +1552,38 @@ static inline int score_move(int move) {
   return 0;
 }
 
+static inline int sort_moves(moves *move_list) { 
+  
+  int move_scores[move_list->count]; 
+
+  for(int i = 0; i < move_list->count; i++) { 
+    move_scores[i] = score_move(move_list->moves[i]);
+  }
+
+  for(int current = 0; current < move_list->count; current++) { 
+    for(int next = current + 1; next < move_list->count; next++) { 
+      //compare current and next move scores
+      if(move_scores[current] < move_scores[next]) { 
+        int temp_score = move_scores[current];
+        move_scores[current] = move_scores[next];
+        move_scores[next] = temp_score;
+
+        int temp_move = move_list->moves[current];
+        move_list->moves[current] = move_list->moves[next];
+        move_list->moves[next] = temp_move;
+      }
+    } 
+  }
+
+}
+  
 void print_move_scores(moves *move_list) { 
-      printf("Move Scores\n\n");
-      for(int i = 0; i < move_list->count; i++) { 
-      printf("    move: "); 
-      print_move(move_list->moves[i]);
-      printf(" score: %d\n", score_move(move_list->moves[i]));
-    }
+  printf("Move Scores\n\n");
+  for(int i = 0; i < move_list->count; i++) { 
+    printf("    move: "); 
+    print_move(move_list->moves[i]);
+    printf(" score: %d\n", score_move(move_list->moves[i]));
+  }
 }
 
 static inline int quiescence(int alpha, int beta) { 
@@ -1812,8 +1837,9 @@ int main() {
     moves move_list[1];
     generate_moves(move_list);
 
+    sort_moves(move_list);
+
     print_move_scores(move_list);
- 
     //search_position(3);
   } else uci_loop();
   return 0;
