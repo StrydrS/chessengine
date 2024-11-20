@@ -1524,9 +1524,36 @@ static int mvv_lva[12][12] = {
 	100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600
 };
 
+int killer_moves[2][64];
+int history_moves[12][64];
+
+/*
+      ================================
+            Triangular PV table
+      --------------------------------
+        PV line: e2e4 e7e5 g1f3 b8c6
+      ================================
+
+           0    1    2    3    4    5
+      
+      0    m1   m2   m3   m4   m5   m6
+      
+      1    0    m2   m3   m4   m5   m6 
+      
+      2    0    0    m3   m4   m5   m6
+      
+      3    0    0    0    m4   m5   m6
+       
+      4    0    0    0    0    m5   m6
+      
+      5    0    0    0    0    0    m6
+*/
+
+int pv_length[64];
+int pv_table[64][64];
+
 //half move counter
 int ply;
-int best_move; 
 
 static inline int score_move(int move) { 
   
@@ -1544,9 +1571,11 @@ static inline int score_move(int move) {
         }
         
       }
-    return mvv_lva[get_piece(move)][target_piece];
+    return mvv_lva[get_piece(move)][target_piece] + 10000;
   } else { 
-    
+    if(killer_moves[0][ply] == move) return 9000;   
+    else if(killer_moves[1][ply] == move) return 8000;   
+    else return history_moves[get_piece(move)][get_target(move)];
   }
 
   return 0;
@@ -1627,6 +1656,7 @@ static inline int quiescence(int alpha, int beta) {
 //negamax alpha beta search
 static inline int negamax(int alpha, int beta, int depth) { 
   
+  pv_length[ply] = ply;
   //recursion escape condition
   if(depth == 0) return quiescence(alpha, beta);
   
@@ -1637,9 +1667,7 @@ static inline int negamax(int alpha, int beta, int depth) {
   //increase search depth if king is in check 
   if(check_state) depth++;
   int legal_moves = 0;
-  int current_best;
-  int old_alpha = alpha;
-
+ 
   moves move_list[1]; 
   generate_moves(move_list);
 
@@ -1664,12 +1692,28 @@ static inline int negamax(int alpha, int beta, int depth) {
     restore_board();
 
     //fail-hard beta cutoff (node (move) fails high)
-    if(score >= beta) return beta;
+    if(score >= beta) { 
+      if(get_capture(move_list->moves[i]) == 0) { 
+        killer_moves[1][ply] = killer_moves[0][ply];
+        killer_moves[0][ply] = move_list->moves[i];
+      }
+
+      return beta;
+
+    }
     //found a better move (PV node)
     if(score > alpha) {
+      if(get_capture(move_list->moves[i]) == 0) { 
+        history_moves[get_piece(move_list->moves[i])][get_target(move_list->moves[i])] += depth;
+      }
       alpha = score;
-      //if root move, associate best move with best score
-      if(ply==0) current_best = move_list->moves[i];
+
+      pv_table[ply][ply] = move_list->moves[i];
+      //copy move from deeper ply into current ply line
+      for(int next_ply = ply + 1; next_ply < pv_length[ply+1]; next_ply ++) {
+        pv_table[ply][next_ply] = pv_table[ply+1][next_ply];
+      }
+      pv_length[ply] = pv_length[ply+1];
     }
   }
 
@@ -1679,8 +1723,7 @@ static inline int negamax(int alpha, int beta, int depth) {
     else return 0;
   }
 
-  if(old_alpha != alpha) best_move = current_best;
-  //node fails low
+ //node fails low
   return alpha;
 
 }
@@ -1688,12 +1731,16 @@ static inline int negamax(int alpha, int beta, int depth) {
 void search_position(int depth) { 
   //find best move within a given position (using negamax algorithm)
   int score = negamax(-50000, 50000, depth);
-  if(best_move) { 
-    printf("info score cp %d depth %d nodes %ld\n", score, depth, nodes);
-    printf("bestmove ");
-    print_move(best_move);
-    printf("\n");
+  
+  printf("info score cp %d depth %d nodes %ld, pv ", score, depth, nodes);
+  for(int i = 0; i < pv_length[0]; i++) {
+    print_move(pv_table[0][i]);
+    printf(" ");
   }
+  printf("\n");
+  printf("bestmove ");
+  print_move(pv_table[0][0]);
+  printf("\n");
 }
 
 /************ UCI ************/
@@ -1777,7 +1824,7 @@ void parse_go(char *command) {
   
   //different time controls placeholder 
   else {
-    depth = 5;
+    depth = 6;
   }
   search_position(depth);
 }
@@ -1834,18 +1881,13 @@ void init_all() {
 int main() { 
   init_all(); 
   
-  int debug = 1;
+  int debug = 0;
   
   if(debug) { 
     parse_fen(tricky_position);
     print_board(); 
-    search_position(6);
-   // moves move_list[1];
-    //generate_moves(move_list);
-
-    //sort_moves(move_list);
-
-    //print_move_scores(move_list);
+    search_position(5);
   } else uci_loop();
   return 0;
 }
+
