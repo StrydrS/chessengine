@@ -1575,9 +1575,6 @@ static inline int score_move(int move) {
   if(score_pv) { 
     if(pv_table[0][ply] == move) {
       score_pv = 0;
-      printf("current pv move: ");
-      print_move(move);
-      printf("  ply: %d\n", ply);
       return 20000;
     }
   }
@@ -1681,6 +1678,8 @@ static inline int quiescence(int alpha, int beta) {
 //negamax alpha beta search
 static inline int negamax(int alpha, int beta, int depth) { 
   
+  int found_pv = 0;
+
   pv_length[ply] = ply;
   //recursion escape condition
   if(depth == 0) return quiescence(alpha, beta);
@@ -1714,9 +1713,20 @@ static inline int negamax(int alpha, int beta, int depth) {
 
     //increment legal moves
     legal_moves++;
+    int score;
 
-    //score current move
-    int score = -negamax(-beta, -alpha, depth - 1);
+    if(found_pv) {
+      //weak search to determine that all other moves are bad
+      score = -negamax(-alpha - 1, -alpha, depth -1);
+      //if algorithm finds out it was wrong, (one of the other moves was better than first PV move), 
+      //research the move that has failed to be proved to be bad
+      if((score > alpha) && (score < beta)) score = -negamax(-beta, -alpha, depth - 1);
+    } else {
+      //score current move
+      score = -negamax(-beta, -alpha, depth - 1);
+
+    }
+
     ply--;
     restore_board();
 
@@ -1737,6 +1747,7 @@ static inline int negamax(int alpha, int beta, int depth) {
       }
       alpha = score;
 
+      found_pv = 1;
       pv_table[ply][ply] = move_list->moves[i];
       //copy move from deeper ply into current ply line
       for(int next_ply = ply + 1; next_ply < pv_length[ply+1]; next_ply ++) {
@@ -1776,40 +1787,16 @@ void search_position(int depth) {
     follow_pv = 1;
     score = negamax(-50000, 50000, current_depth);
     
-    printf("info score cp %d depth %d nodes %ld, pv ", score, current_depth, nodes);
-    for(int i = 0; i < pv_length[0]; i++) {
-      print_move(pv_table[0][i]);
-      printf(" ");
-    }
-    printf("\n");
+    //printf("info score cp %d depth %d nodes %ld, pv ", score, current_depth, nodes);
+    //for(int i = 0; i < pv_length[0]; i++) {
+    //  print_move(pv_table[0][i]);
+    //  printf(" ");
+    //}
+    //printf("\n");
   }
 
   printf("bestmove ");
   print_move(pv_table[0][0]);
-  printf("\n");
-  nodes = 0;
-
-  
-  follow_pv = 0;
-  score_pv = 0; 
-  //clear helper data structures for search
-  memset(killer_moves, 0, sizeof(killer_moves));
-  memset(history_moves, 0, sizeof(history_moves));
-  memset(pv_table, 0, sizeof(pv_table));
-  memset(pv_length, 0, sizeof(pv_length));
-
-  //find best move within a given position (using negamax algorithm)
-  score = negamax(-50000, 50000, depth);
-  
-  //printf("info score cp %d depth %d nodes %ld, pv ", score, depth, nodes);
-  //for(int i = 0; i < pv_length[0]; i++) {
-  //  print_move(pv_table[0][i]);
-  //  printf(" ");
-  //}
-  //printf("\n");
-  //printf("bestmove ");
-  //print_move(pv_table[0][0]);
-  //printf("\n");
 }
 
 /************ UCI ************/
@@ -1882,7 +1869,7 @@ void parse_position(char *command) {
       current_char++;
     }
   }
-  print_board();
+ // print_board();
 }
 
 //parse UCI "go" command, ex. "go depth 6"
@@ -1953,7 +1940,7 @@ int main() {
   int debug = 0;
   
   if(debug) { 
-    parse_fen(tricky_position);
+    parse_fen(cmk_position);
     print_board(); 
     search_position(6);
   } else uci_loop();
