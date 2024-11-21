@@ -853,9 +853,14 @@ static inline void add_move(moves *move_list, int move) {
 
 //print move
 void print_move(int move) { 
-  printf("%s%s%c", square_coordinates[get_source(move)], 
+  if(get_promoted(move)) {
+    printf("%s%s%c", square_coordinates[get_source(move)], 
                      square_coordinates[get_target(move)],
                      promoted_pieces[get_promoted(move)]);
+  } else {
+  printf("%s%s", square_coordinates[get_source(move)], 
+                     square_coordinates[get_target(move)]);
+  }
 }
 
 //print move
@@ -1787,16 +1792,18 @@ void search_position(int depth) {
     follow_pv = 1;
     score = negamax(-50000, 50000, current_depth);
     
-    //printf("info score cp %d depth %d nodes %ld, pv ", score, current_depth, nodes);
-    //for(int i = 0; i < pv_length[0]; i++) {
-    //  print_move(pv_table[0][i]);
-    //  printf(" ");
-    //}
-    //printf("\n");
-  }
+ //   printf("info score cp %d depth %d nodes %ld pv ", score, current_depth, nodes);
+ //   for(int i = 0; i < pv_length[0]; i++) {
+ //     print_move(pv_table[0][i]);
+ //     printf(" ");
+ //   }
+ //   printf("\n");
+ }
 
   printf("bestmove ");
   print_move(pv_table[0][0]);
+  printf("\n");
+  fflush(stdout);
 }
 
 /************ UCI ************/
@@ -1869,7 +1876,7 @@ void parse_position(char *command) {
       current_char++;
     }
   }
- // print_board();
+  //print_board();
 }
 
 //parse UCI "go" command, ex. "go depth 6"
