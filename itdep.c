@@ -1554,11 +1554,34 @@ int history_moves[12][64];
 int pv_length[max_ply];
 int pv_table[max_ply][max_ply];
 
+int follow_pv, score_pv;
+
 //half move counter
 int ply;
 
+static inline void enable_pv_scoring(moves *move_list) {
+  
+  follow_pv = 0; 
+  for(int i = 0; i < move_list->count; i++) { 
+    if(pv_table[0][ply] == move_list->moves[i]) {
+      score_pv = 1;
+      follow_pv = 1;
+    }
+  }
+}
+
 static inline int score_move(int move) { 
   
+  if(score_pv) { 
+    if(pv_table[0][ply] == move) {
+      score_pv = 0;
+      printf("current pv move: ");
+      print_move(move);
+      printf("  ply: %d\n", ply);
+      return 20000;
+    }
+  }
+
   if(get_capture(move)) { 
       int target_piece = P;
       int start_piece, end_piece;
@@ -1675,6 +1698,8 @@ static inline int negamax(int alpha, int beta, int depth) {
   moves move_list[1]; 
   generate_moves(move_list);
 
+  if(follow_pv) enable_pv_scoring(move_list);
+
   sort_moves(move_list);
   //loop over moves within movelist
   for(int i = 0; i < move_list->count; i++) {
@@ -1734,7 +1759,11 @@ static inline int negamax(int alpha, int beta, int depth) {
 
 void search_position(int depth) { 
   
+  int score = 0;
   nodes = 0;
+
+  follow_pv = 0;
+  score_pv = 0; 
 
   //clear helper data structures for search
   memset(killer_moves, 0, sizeof(killer_moves));
@@ -1742,18 +1771,45 @@ void search_position(int depth) {
   memset(pv_table, 0, sizeof(pv_table));
   memset(pv_length, 0, sizeof(pv_length));
 
-  //find best move within a given position (using negamax algorithm)
-  int score = negamax(-50000, 50000, depth);
-  
-  printf("info score cp %d depth %d nodes %ld, pv ", score, depth, nodes);
-  for(int i = 0; i < pv_length[0]; i++) {
-    print_move(pv_table[0][i]);
-    printf(" ");
+  //iterative deepening
+  for(int current_depth = 1; current_depth <= depth; current_depth++) { 
+    follow_pv = 1;
+    score = negamax(-50000, 50000, current_depth);
+    
+    printf("info score cp %d depth %d nodes %ld, pv ", score, current_depth, nodes);
+    for(int i = 0; i < pv_length[0]; i++) {
+      print_move(pv_table[0][i]);
+      printf(" ");
+    }
+    printf("\n");
   }
-  printf("\n");
+
   printf("bestmove ");
   print_move(pv_table[0][0]);
   printf("\n");
+  nodes = 0;
+
+  
+  follow_pv = 0;
+  score_pv = 0; 
+  //clear helper data structures for search
+  memset(killer_moves, 0, sizeof(killer_moves));
+  memset(history_moves, 0, sizeof(history_moves));
+  memset(pv_table, 0, sizeof(pv_table));
+  memset(pv_length, 0, sizeof(pv_length));
+
+  //find best move within a given position (using negamax algorithm)
+  score = negamax(-50000, 50000, depth);
+  
+  //printf("info score cp %d depth %d nodes %ld, pv ", score, depth, nodes);
+  //for(int i = 0; i < pv_length[0]; i++) {
+  //  print_move(pv_table[0][i]);
+  //  printf(" ");
+  //}
+  //printf("\n");
+  //printf("bestmove ");
+  //print_move(pv_table[0][0]);
+  //printf("\n");
 }
 
 /************ UCI ************/
