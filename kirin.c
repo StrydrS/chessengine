@@ -1,6 +1,16 @@
-// created by Strydr Silverberg
-// sophomore year Colorado School of Mines
-// use as you wish 
+/* 
+      ,  ,
+          \\ \\                 Kirin Chess Engine v0.1 (not officially released)
+          ) \\ \\    _p_        created by Strydr Silverberg    
+          )^\))\))  /  *\       sophomore year Colorado School of Mines
+           \_|| || / /^`-' 
+  __       -\ \\--/ /           special thanks to
+<'  \\___/   ___. )'            Maxim Korzh                                 https://github.com/maksimKorzh
+     `====\ )___/\\             ChessProgramming.org                        https://www.chessprogramming.org
+          //     `"             Talk Chess (Computer Chess Club)            https://talkchess.com/
+          \\    /  \            
+          `"
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,7 +115,7 @@ int enpassant = no_sq;
 int castle;
 
 /************ Random Magic Numbers! ************/
-//from Tord Romstad's proposal to find magic numbers
+//from Tord Romstad's proposal to find magic numbers https://www.chessprogramming.org/Looking_for_Magics
 //pseudo random number state
 unsigned int rand_state = 1804289383;
 
@@ -853,9 +863,14 @@ static inline void add_move(moves *move_list, int move) {
 
 //print move
 void print_move(int move) { 
-  printf("%s%s%c", square_coordinates[get_source(move)], 
+  if(get_promoted(move)) {
+    printf("%s%s%c", square_coordinates[get_source(move)], 
                      square_coordinates[get_target(move)],
                      promoted_pieces[get_promoted(move)]);
+  } else {
+  printf("%s%s", square_coordinates[get_source(move)], 
+                     square_coordinates[get_target(move)]);
+  }
 }
 
 //print move
@@ -1554,11 +1569,31 @@ int history_moves[12][64];
 int pv_length[max_ply];
 int pv_table[max_ply][max_ply];
 
+int follow_pv, score_pv;
+
 //half move counter
 int ply;
 
+static inline void enable_pv_scoring(moves *move_list) {
+  
+  follow_pv = 0; 
+  for(int i = 0; i < move_list->count; i++) { 
+    if(pv_table[0][ply] == move_list->moves[i]) {
+      score_pv = 1;
+      follow_pv = 1;
+    }
+  }
+}
+
 static inline int score_move(int move) { 
   
+  if(score_pv) { 
+    if(pv_table[0][ply] == move) {
+      score_pv = 0;
+      return 20000;
+    }
+  }
+
   if(get_capture(move)) { 
       int target_piece = P;
       int start_piece, end_piece;
@@ -1658,6 +1693,8 @@ static inline int quiescence(int alpha, int beta) {
 //negamax alpha beta search
 static inline int negamax(int alpha, int beta, int depth) { 
   
+  int found_pv = 0;
+
   pv_length[ply] = ply;
   //recursion escape condition
   if(depth == 0) return quiescence(alpha, beta);
@@ -1675,6 +1712,8 @@ static inline int negamax(int alpha, int beta, int depth) {
   moves move_list[1]; 
   generate_moves(move_list);
 
+  if(follow_pv) enable_pv_scoring(move_list);
+
   sort_moves(move_list);
   //loop over moves within movelist
   for(int i = 0; i < move_list->count; i++) {
@@ -1689,9 +1728,20 @@ static inline int negamax(int alpha, int beta, int depth) {
 
     //increment legal moves
     legal_moves++;
+    int score;
 
-    //score current move
-    int score = -negamax(-beta, -alpha, depth - 1);
+    if(found_pv) {
+      //weak search to determine that all other moves are bad
+      score = -negamax(-alpha - 1, -alpha, depth -1);
+      //if algorithm finds out it was wrong, (one of the other moves was better than first PV move), 
+      //research the move that has failed to be proved to be bad
+      if((score > alpha) && (score < beta)) score = -negamax(-beta, -alpha, depth - 1);
+    } else {
+      //score current move
+      score = -negamax(-beta, -alpha, depth - 1);
+
+    }
+
     ply--;
     restore_board();
 
@@ -1712,6 +1762,7 @@ static inline int negamax(int alpha, int beta, int depth) {
       }
       alpha = score;
 
+      found_pv = 1;
       pv_table[ply][ply] = move_list->moves[i];
       //copy move from deeper ply into current ply line
       for(int next_ply = ply + 1; next_ply < pv_length[ply+1]; next_ply ++) {
@@ -1734,7 +1785,11 @@ static inline int negamax(int alpha, int beta, int depth) {
 
 void search_position(int depth) { 
   
+  int score = 0;
   nodes = 0;
+
+  follow_pv = 0;
+  score_pv = 0; 
 
   //clear helper data structures for search
   memset(killer_moves, 0, sizeof(killer_moves));
@@ -1742,18 +1797,23 @@ void search_position(int depth) {
   memset(pv_table, 0, sizeof(pv_table));
   memset(pv_length, 0, sizeof(pv_length));
 
-  //find best move within a given position (using negamax algorithm)
-  int score = negamax(-50000, 50000, depth);
-  
-  printf("info score cp %d depth %d nodes %ld, pv ", score, depth, nodes);
-  for(int i = 0; i < pv_length[0]; i++) {
-    print_move(pv_table[0][i]);
-    printf(" ");
-  }
-  printf("\n");
+  //iterative deepening
+  for(int current_depth = 1; current_depth <= depth; current_depth++) { 
+    follow_pv = 1;
+    score = negamax(-50000, 50000, current_depth);
+    
+ //   printf("info score cp %d depth %d nodes %ld pv ", score, current_depth, nodes);
+ //   for(int i = 0; i < pv_length[0]; i++) {
+ //     print_move(pv_table[0][i]);
+ //     printf(" ");
+ //   }
+ //   printf("\n");
+ }
+
   printf("bestmove ");
   print_move(pv_table[0][0]);
   printf("\n");
+  fflush(stdout);
 }
 
 /************ UCI ************/
@@ -1826,7 +1886,7 @@ void parse_position(char *command) {
       current_char++;
     }
   }
-  print_board();
+  //print_board();
 }
 
 //parse UCI "go" command, ex. "go depth 6"
@@ -1897,7 +1957,7 @@ int main() {
   int debug = 0;
   
   if(debug) { 
-    parse_fen(tricky_position);
+    parse_fen(cmk_position);
     print_board(); 
     search_position(6);
   } else uci_loop();

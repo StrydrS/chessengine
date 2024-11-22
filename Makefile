@@ -1,5 +1,5 @@
 all:
-	gcc -Ofast main.c -o main 
+	gcc -Ofast kirin.c -o kirin
 
 debug:
-	gcc main.c -o main
+	gcc kirin.c -o kirin
