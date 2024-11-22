@@ -59,6 +59,9 @@ Special thanks to the following resources and contributors for their guidance an
 - [Maxim Korzh](https://github.com/maksimKorzh)
 - [ChessProgramming.org](https://www.chessprogramming.org)
 - [TalkChess (Computer Chess Club)](https://talkchess.com/)
+- [Glaurung Chess - Late Move Reduction](https://web.archive.org/web/20150212051846/http://www.glaurungchess.com/lmr.html)
+- [Bruce Moreland - Principal Variation Search](https://web.archive.org/web/20071030220825/http://www.brucemo.com/compchess/programming/pvs.htm)
+
 
 ## License
 
