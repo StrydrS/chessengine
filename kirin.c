@@ -12,8 +12,9 @@
           `"
 */
 
-#include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
 
@@ -113,6 +114,63 @@ U64 occupancy[3];
 int side;
 int enpassant = no_sq;
 int castle;
+
+
+/************ Time Control Variables ************/
+int quit = 0;
+int movesToGo = 30;
+int moveTime = -1;
+int time = -1;
+int inc = 0;
+int startTime = 0;
+int stopTime = 0;
+int timeSet = 0;
+int stopped = 0;
+
+
+/************ UCI Time Control Functions from VICE by Richard Allbert ************/
+int getTimeMS() { 
+  //get time in ms
+  struct timeval time;
+  gettimeofday(&time, NULL);
+  return time.tv_sec * 1000 + time.tv_usec / 1000;
+}
+
+int inputWaiting() {
+  fd_set readfds;
+  struct timeval tv;
+  FD_ZERO (&readfds);
+  FD_SET (fileno(stdin), &readfds);
+  tv.tv_sec=0; tv.tv_usec=0;
+  select(16, &readfds, 0, 0, &tv);
+
+  return (FD_ISSET(fileno(stdin), &readfds));
+}
+
+void readInput() { 
+  int bytes;
+  char input[256] = "", *endc;
+
+  if(inputWaiting()) { 
+    stopped = 1;
+    do {
+      bytes = read(fileno(stdin), input, 256);
+    } while(bytes < 0);
+
+    endc = strchr(input, '\n');
+    if(endc) *endc=0;
+
+    if(strlen(input) > 0) { 
+      if(!strncmp(input, "quit", 4)) quit = 1;
+      else if(!strncmp(input, "stop", 4)) quit = 1;
+    }
+  }
+}
+
+static void communicate() { 
+  if(timeSet == 1 && getTimeMS() > stopTime) stopped = 1;
+  readInput();
+}
 
 /************ Random Magic Numbers! ************/
 //from Tord Romstad's proposal to find magic numbers https://www.chessprogramming.org/Looking_for_Magics
@@ -1308,12 +1366,6 @@ static inline void generateMoves(moves *moveList) {
 }
 
 /************ Perft Testing ************/
-int getTimeMS() { 
-  //get time in ms
-  struct timeval time;
-  gettimeofday(&time, NULL);
-  return time.tv_sec * 1000 + time.tv_usec / 1000;
-}
 
 //leaf nodes (num of positions reached during perft at a given depth)
 long nodes; 
@@ -1662,6 +1714,8 @@ void printMoveScores(moves *moveList) {
 
 static inline int quiescence(int alpha, int beta) { 
   
+  if((nodes & 2047) == 0) communicate();
+
   nodes++;
 
   int eval = evaluate();
@@ -1690,6 +1744,8 @@ static inline int quiescence(int alpha, int beta) {
     ply--;
     restoreBoard();
 
+    if(stopped == 1) return 0;
+
     //fail-hard beta cutoff (node (move) fails high)
     if(score >= beta) return beta;
     //found a better move (PV node)
@@ -1704,6 +1760,7 @@ const int reductionLimit = 3;
 //negamax alpha beta search
 static inline int negamax(int alpha, int beta, int depth) { 
 
+  if((nodes & 2047) == 0) communicate();
   pvLength[ply] = ply;
   //recursion escape condition
   if(depth == 0) return quiescence(alpha, beta);
@@ -1728,6 +1785,7 @@ static inline int negamax(int alpha, int beta, int depth) {
     int score = -negamax(-beta, -beta + 1, depth - 3);
 
     restoreBoard();
+    if(stopped == 1) return 0;
     if(score >= beta) return beta;
   }
 
@@ -1782,6 +1840,7 @@ static inline int negamax(int alpha, int beta, int depth) {
     ply--;
     restoreBoard();
 
+    if(stopped == 1) return 0;
     movesSearched++; 
 
     //fail-hard beta cutoff (node (move) fails high)
@@ -1825,6 +1884,7 @@ void searchPosition(int depth) {
   
   int score = 0;
   nodes = 0;
+  stopped = 0;
 
   followPV = 0;
   scorePV = 0; 
@@ -1840,6 +1900,7 @@ void searchPosition(int depth) {
 
   //iterative deepening
   for(int currentDepth = 1; currentDepth <= depth; currentDepth++) { 
+    if(stopped == 1) break;
     followPV = 1;
     score = negamax(alpha, beta, currentDepth);
     
@@ -1942,16 +2003,58 @@ void parsePosition(char *command) {
 }
 
 //parse UCI "go" command, ex. "go depth 6"
-void parseGo(char *command) { 
-  int depth = -1;
-  char *currentDepth = NULL;
-  if((currentDepth = strstr(command, "depth"))) depth = atoi(currentDepth + 6);
-  
-  //different time controls placeholder 
-  else {
-    depth = 10;
-  }
-  searchPosition(depth);
+void parseGo(char *command)
+{
+
+    int depth = -1;
+    char *argument = NULL;
+
+    if((argument = strstr(command,"infinite"))) {}
+
+    if((argument = strstr(command,"binc")) && side == black)
+        inc = atoi(argument + 5);
+
+    if((argument = strstr(command,"winc")) && side == white)
+        inc = atoi(argument + 5);
+
+    if ((argument = strstr(command,"wtime")) && side == white)
+        time = atoi(argument + 6);
+
+    if((argument = strstr(command,"btime")) && side == black)
+        time = atoi(argument + 6);
+
+    if((argument = strstr(command,"movestogo")))
+        movesToGo = atoi(argument + 10);
+
+    if((argument = strstr(command,"movetime")))
+        moveTime = atoi(argument + 9);
+
+    if((argument = strstr(command,"depth")))
+        depth = atoi(argument + 6);
+
+    if(moveTime != -1) {
+        time = moveTime;
+        movesToGo = 1;
+    }
+
+    startTime = getTimeMS();
+
+    depth = depth;
+
+    if(time != -1) {
+        timeSet = 1;
+
+        time /= movesToGo;
+        time -= 50;
+        stopTime = startTime + time + inc;
+    }
+
+    if(depth == -1) depth = 64;
+
+    printf("time:%d start:%d stop:%d depth:%d timeSet:%d\n",
+    time, startTime, stopTime, depth, timeSet);
+
+    searchPosition(depth);
 }
 
 // GUI -> isready   
@@ -1959,38 +2062,53 @@ void parseGo(char *command) {
 // GUI -> ucinewgame
 // "handshake" protocol within UCI
 
-void uciLoop() { 
-  //reset stdin & stdout buffers
-  setbuf(stdin, NULL);
-  setbuf(stdout, NULL);
-
-  //define USER/GUI input buff(large for FEN strings and move strings"
-  char input[2000];
-
-  printf("id name ce\n");
-  printf("author name Strydr Silverberg\n");
-  printf("uciok\n");
-
-  //main "game" loop
-  while(1) { 
-    memset(input, 0, sizeof(input));
-    fflush(stdout);
-    if(!fgets(input, 2000, stdin)) continue;
-    if(input[0] == '\n') continue;
-    if(!strncmp(input, "isready", 7)) {
-      printf("readyok\n");
-      continue;
+void uciLoop() {
+    setbuf(stdin, NULL);
+    setbuf(stdout, NULL);
+    
+    char input[2000];
+    
+    // print engine info
+    printf("id name Kirin\n");
+    printf("author name Strydr Silverberg\n");
+    printf("uciok\n");
+    
+    while (1)
+    {
+        memset(input, 0, sizeof(input));
+        fflush(stdout);
+        
+        if(!fgets(input, 2000, stdin))
+            continue;
+      
+        if(input[0] == '\n')
+            continue;
+      
+        if(strncmp(input, "isready", 7) == 0)
+        {
+            printf("readyok\n");
+            continue;
+        }
+        
+        else if(strncmp(input, "position", 8) == 0)
+            parsePosition(input);
+  
+        else if(strncmp(input, "ucinewgame", 10) == 0)
+            parsePosition("position startpos");
+        
+        else if(strncmp(input, "go", 2) == 0)
+            parseGo(input);
+        
+        else if(strncmp(input, "quit", 4) == 0)
+            break;
+        
+        else if (strncmp(input, "uci", 3) == 0)
+        {
+          printf("id name Kirin\n");
+          printf("author name Strydr Silverberg\n");
+          printf("uciok\n");
+        }
     }
-    else if(!strncmp(input, "position", 8)) parsePosition(input);
-    else if(!strncmp(input, "ucinewgame", 10)) parsePosition("position startpos");
-    else if(!strncmp(input, "go", 2)) parseGo(input);
-    else if(!strncmp(input, "quit", 4)) break;
-    else if(!strncmp(input, "uci", 3)) {
-      printf("id name ce\n");
-      printf("author name Strydr Silverberg\n");
-      printf("uciok\n");
-    }
-  }
 }
 
 /************ Init All ************/
@@ -2006,7 +2124,7 @@ void initAll() {
 int main() { 
   initAll(); 
   
-  int debug = 1;
+  int debug = 0;
   
   if(debug) { 
     parseFEN(tricky_position);
