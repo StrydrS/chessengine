@@ -1752,6 +1752,30 @@ int followPV, scorePV;
 //half move counter
 int ply;
 
+/************ Transposition Table ************/
+#define hashSize 0x400000
+#define hashFlagExact 0
+#define hashFlagAlpha 1
+#define hashFlagBeta 2
+
+typedef struct {
+  U64 key; 
+  int depth;
+  int flag;
+  int score;
+} tt; //transposition table
+
+tt transpositionTable[hashSize];
+
+void clearTranspositionTable() { 
+  for(int index = 0; index < hashSize; index++) { 
+    transpositionTable[index].key = 0;
+    transpositionTable[index].depth = 0;
+    transpositionTable[index].flag = 0;
+    transpositionTable[index].score = 0;
+  }
+}
+
 static inline void enablePvScoring(moves *moveList) {
   
   followPV = 0; 
@@ -2254,10 +2278,11 @@ int main() {
   int debug = 1;
   
   if(debug) { 
-    parseFEN(tricky_position);
+    parseFEN(startPosition);
     printBoard(); 
+    clearTranspositionTable();
     //searchPosition(7);
-    perftTest(5);
+    //perftTest(6);
   } else uciLoop();
   return 0;
 }
