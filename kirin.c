@@ -1896,6 +1896,8 @@ static inline int quiescence(int alpha, int beta) {
   if((nodes & 2047) == 0) communicate();
 
   nodes++;
+  
+  if(ply > maxPly - 1) return evaluate();
 
   int eval = evaluate();
   if(eval >= beta) return beta;
@@ -1925,10 +1927,12 @@ static inline int quiescence(int alpha, int beta) {
 
     if(stopped == 1) return 0;
 
-    //fail-hard beta cutoff (node (move) fails high)
-    if(score >= beta) return beta;
     //found a better move (PV node)
-    if(score > alpha) alpha = score;
+    if(score > alpha) {
+      alpha = score;
+      //fail-hard beta cutoff (node (move) fails high)
+      if(score >= beta) return beta;
+    }
   }
   return alpha;
 }
@@ -1941,7 +1945,7 @@ static inline int negamax(int alpha, int beta, int depth) {
   int score;
   int hashFlag = hashFlagAlpha;
 
-  if((score = readHashEntry(alpha, beta, depth)) != noHashEntry) {
+  if(ply && (score = readHashEntry(alpha, beta, depth)) != noHashEntry) {
     return score; 
   }
 
@@ -1963,6 +1967,7 @@ static inline int negamax(int alpha, int beta, int depth) {
   // null move pruning
   if(depth >= 3 && inCheck == 0 && ply) {
     copyBoard();
+    ply++;
 
     if(enpassant != no_sq) hashKey ^= enpassantKeys[enpassant];
     enpassant = no_sq;
@@ -1970,7 +1975,8 @@ static inline int negamax(int alpha, int beta, int depth) {
     hashKey ^= sideKey;
     //depth - 1 - R where R is the reduction limit
     score = -negamax(-beta, -beta + 1, depth - 3);
-
+    
+    ply--;
     restoreBoard();
     if(stopped == 1) return 0;
     if(score >= beta) return beta;
@@ -2029,18 +2035,7 @@ static inline int negamax(int alpha, int beta, int depth) {
     if(stopped == 1) return 0;
     movesSearched++; 
 
-    //fail-hard beta cutoff (node (move) fails high)
-    if(score >= beta) { 
-      recordHash(beta, depth, hashFlagBeta);
-      if(getCapture(moveList->moves[i]) == 0) { 
-        killerMoves[1][ply] = killerMoves[0][ply];
-        killerMoves[0][ply] = moveList->moves[i];
-      }
-
-      return beta;
-
-    }
-    //found a better move (PV node)
+   //found a better move (PV node)
     if(score > alpha) {
       hashFlag = hashFlagExact;
       if(getCapture(moveList->moves[i]) == 0) { 
@@ -2054,6 +2049,15 @@ static inline int negamax(int alpha, int beta, int depth) {
         pvTable[ply][nextPly] = pvTable[ply+1][nextPly];
       }
       pvLength[ply] = pvLength[ply+1];
+      //fail-hard beta cutoff (node (move) fails high)
+      if(score >= beta) { 
+        recordHash(beta, depth, hashFlagBeta);
+        if(getCapture(moveList->moves[i]) == 0) { 
+          killerMoves[1][ply] = killerMoves[0][ply];
+          killerMoves[0][ply] = moveList->moves[i];
+        }
+        return beta;
+      }
     }
   }
 
@@ -2084,7 +2088,7 @@ void searchPosition(int depth) {
   memset(pvTable, 0, sizeof(pvTable));
   memset(pvLength, 0, sizeof(pvLength));
 
-  clearTranspositionTable();
+  //clearTranspositionTable();
 
   int alpha = -50000;
   int beta = 50000;
@@ -2284,9 +2288,10 @@ void uciLoop() {
         else if(strncmp(input, "position", 8) == 0)
             parsePosition(input);
   
-        else if(strncmp(input, "ucinewgame", 10) == 0)
+        else if(strncmp(input, "ucinewgame", 10) == 0) {
             parsePosition("position startpos");
-        
+            clearTranspositionTable();
+        }
         else if(strncmp(input, "go", 2) == 0)
             parseGo(input);
         
@@ -2309,6 +2314,8 @@ void initAll() {
   initSliderAttacks(bishop);  
   initSliderAttacks(rook);
   initRandKeys();
+  
+  clearTranspositionTable();
 }
 
 /************ Main Driver ************/
@@ -2316,12 +2323,15 @@ void initAll() {
 int main() { 
   initAll(); 
   
-  int debug = 1;
+  int debug = 0;
   
   if(debug) { 
-    parseFEN(tricky_position);
+    parseFEN(startPosition);
     printBoard(); 
-    searchPosition(7);
+    searchPosition(10);
+    
+    makeMove(pvTable[0][0], allMoves);
+    searchPosition(10);
     //info score cp 20 depth 7 nodes 56762 pv b1c3 d7d5 d2d4 b8c6 g1f3 g8f6 c1f4
   } else uciLoop();
   return 0;
