@@ -1,6 +1,6 @@
 /* 
       ,  ,
-          \\ \\                 Kirin Chess Engine v0.1 (not officially released)
+          \\ \\                 Kirin Chess Engine v0.2 (not officially released)
           ) \\ \\    _p_        created by Strydr Silverberg    
           )^\))\))  /  *\       sophomore year Colorado School of Mines
            \_|| || / /^`-' 
@@ -115,6 +115,8 @@ int side;
 int enpassant = no_sq;
 int castle;
 
+//"almost" unique position identifier -> hash key/position key
+U64 hashKey;
 
 /************ Time Control Variables ************/
 int quit = 0;
@@ -235,6 +237,56 @@ static inline int getLSBindex(U64 bitboard) {
   } else return -1;
 }
 
+/************ Zobrist Hashing ************/
+//random piece keys [piece][square] enpassant[square]
+U64 pieceKeys[12][64];
+U64 enpassantKeys[64];
+U64 castlingKeys[16];
+U64 sideKey; 
+
+void initRandKeys() { 
+  randState = 1804289383;
+  for(int piece = P; piece <= k; piece++) { 
+    for(int square = 0; square < 64; square++) { 
+      pieceKeys[piece][square] = getRandU64();
+   }
+  }
+
+  for(int square = 0; square < 64; square++) { 
+    enpassantKeys[square] = getRandU64();
+  }
+
+  for(int key = 0; key < 16; key++) { 
+    castlingKeys[key] = getRandU64();
+  }
+
+  sideKey = getRandU64(); 
+}
+
+
+//generate "almost" unique position identifier aka hash key from scratch
+U64 generateHashKey() { 
+  U64 finalKey = 0ULL; 
+
+  U64 bitboard;
+
+  for(int piece = P; piece <= k; piece++) { 
+    bitboard = bitboards[piece];
+    while(bitboard) { 
+      int square = getLSBindex(bitboard);
+      finalKey ^= pieceKeys[piece][square];
+      popBit(bitboard, square);
+    }
+  }
+
+  if(enpassant != no_sq) finalKey ^= enpassantKeys[enpassant];
+
+  finalKey ^= castlingKeys[castle];
+
+  if(side == black) finalKey ^= sideKey;
+  return finalKey;
+}
+
 /************ Input/Output ************/
 void printBitboard(U64 bitboard) {
   printf("\n");
@@ -275,6 +327,7 @@ void printBoard() {
                                         (castle & wq) ? 'Q' : '-', 
                                         (castle & bk) ? 'k' : '-',  
                                         (castle & bq) ? 'q' : '-'); 
+  printf("    Hash Key: %llx\n", hashKey);
 }
 
 void parseFEN(char *fen) { 
@@ -352,6 +405,9 @@ void parseFEN(char *fen) {
 
   occupancy[both] |= occupancy[white];
   occupancy[both] |= occupancy[black];
+
+  hashKey = generateHashKey();
+
 }
 
 /************ Attacks ************/
@@ -965,6 +1021,7 @@ void printMove_list(moves *moveList) {
   sideCopy = side;                             \
   enpassantCopy = enpassant;                   \
   castleCopy = castle;                         \
+  U64 hashKeyCopy = hashKey;                   \
 
 #define restoreBoard()                         \
   memcpy(bitboards, bitboardsCopy, 96);        \
@@ -972,6 +1029,7 @@ void printMove_list(moves *moveList) {
   side = sideCopy;                             \
   enpassant = enpassantCopy;                   \
   castle = castleCopy;                         \
+  hashKey = hashKeyCopy;                       \
 
 enum { allMoves, onlyCaptures };
 
@@ -1008,6 +1066,10 @@ static inline int makeMove(int move, int move_flag) {
     popBit(bitboards[piece], sourceSquare);
     setBit(bitboards[piece], targetSquare);
     
+    //hash piece  (remove piece from source square, add piece to target square)
+    hashKey ^= pieceKeys[piece][sourceSquare]; 
+    hashKey ^= pieceKeys[piece][targetSquare]; 
+
     //handling capture moves
     if(capture) { 
       int startPiece, endPiece;
@@ -1023,26 +1085,55 @@ static inline int makeMove(int move, int move_flag) {
         //if piece on target square, remove it from corresponding bitboard
         if(getBit(bitboards[bbPiece], targetSquare)) {
           popBit(bitboards[bbPiece], targetSquare);
+          //remove piece from hash key
+          hashKey ^= pieceKeys[bbPiece][targetSquare];
           break;
         }
         
       }
     }
+
     //handle pawn promotion
     if(promoted) {  
       //erase pawn from target square
-      popBit(bitboards[(side == white) ? P : p], targetSquare);
+      //popBit(bitboards[(side == white) ? P : p], targetSquare);
+      if(side == white) {
+        popBit(bitboards[P], targetSquare);
+        hashKey ^= pieceKeys[P][targetSquare];
+      } else {
+        popBit(bitboards[p], targetSquare);
+        hashKey ^= pieceKeys[p][targetSquare];
+      }
       //setup promoted piece on board
       setBit(bitboards[promoted], targetSquare);
+      hashKey ^= pieceKeys[promoted][targetSquare];
     }
+
     //handle enpassant moves
     if(enpass) { 
       (side == white) ? popBit(bitboards[p], targetSquare + 8) : popBit(bitboards[P], targetSquare - 8);
+      if(side == white) { 
+        popBit(bitboards[p], targetSquare + 8);
+        hashKey ^= pieceKeys[p][targetSquare + 8];
+      } else {
+        popBit(bitboards[P], targetSquare - 8);
+        hashKey ^= pieceKeys[P][targetSquare - 8];
+      }
     }
+
+    if(enpassant != no_sq) hashKey ^= enpassantKeys[enpassant];
     enpassant = no_sq;
+
     //handle double pawn push
     if(dpp) { 
       (side == white) ? (enpassant = targetSquare + 8) : (enpassant = targetSquare - 8);
+      if(side == white) { 
+        enpassant = targetSquare + 8;
+        hashKey ^= enpassantKeys[targetSquare + 8];
+      } else {
+        enpassant = targetSquare - 8;
+        hashKey ^= enpassantKeys[targetSquare - 8];
+      }
     }
 
     if(castling) { 
@@ -1050,25 +1141,42 @@ static inline int makeMove(int move, int move_flag) {
         case g1:
           popBit(bitboards[R], h1);
           setBit(bitboards[R], f1); 
+
+          hashKey ^= pieceKeys[R][h1];
+          hashKey ^= pieceKeys[R][f1];
           break;
         case c1:
           popBit(bitboards[R], a1);
-          setBit(bitboards[R], d1); 
+          setBit(bitboards[R], d1);
+
+          hashKey ^= pieceKeys[R][a1];
+          hashKey ^= pieceKeys[R][d1];
           break;
         case g8:
           popBit(bitboards[r], h8);
           setBit(bitboards[r], f8); 
+
+          hashKey ^= pieceKeys[r][h8];
+          hashKey ^= pieceKeys[r][f8];
           break;
         case c8:
           popBit(bitboards[r], a8);
           setBit(bitboards[r], d8); 
+
+          hashKey ^= pieceKeys[r][a8];
+          hashKey ^= pieceKeys[r][d8];
           break;
       }
     }
 
+    //hash castling rights
+    hashKey ^= castlingKeys[castle];
+
     //handle update castling rights
     castle &= castlingRights[sourceSquare];
     castle &= castlingRights[targetSquare];
+
+    hashKey ^= castlingKeys[castle];
 
     //update occupancies
     memset(occupancy, 0ULL, 24);
@@ -1086,6 +1194,23 @@ static inline int makeMove(int move, int move_flag) {
 
     //change side
     side ^= 1;
+
+    //hash side
+    hashKey ^= sideKey;
+
+
+    //debug hash key incremental update
+    //U64 hashFromScratch = generateHashKey();
+  
+    ////in case the hash key built from scratch doesn't match
+    ////the one that was incrementally updated we interrupt execution
+    //if(hashKey != hashFromScratch) {
+    //  printf("\n\nMake move\n");
+    //  printf("move: "); printMove(move);
+    //  printBoard();
+    //  printf("Hash key should be: %llx\n", hashFromScratch);
+    //  getchar();
+    //}
 
     //make sure the king isn't in check
     if(isAttacked((side == white) ? getLSBindex(bitboards[k]) : getLSBindex(bitboards[K]) , side)) { 
@@ -1392,6 +1517,7 @@ static inline void perftDriver(int depth) {
     //call perft driver recursively
     perftDriver(depth - 1);
     restoreBoard();
+  
   }
 }
 
@@ -2117,6 +2243,7 @@ void initAll() {
   initLeaperAttacks(); 
   initSliderAttacks(bishop);  
   initSliderAttacks(rook);
+  initRandKeys();
 }
 
 /************ Main Driver ************/
@@ -2124,12 +2251,13 @@ void initAll() {
 int main() { 
   initAll(); 
   
-  int debug = 0;
+  int debug = 1;
   
   if(debug) { 
     parseFEN(tricky_position);
     printBoard(); 
-    searchPosition(8);
+    //searchPosition(7);
+    perftTest(5);
   } else uciLoop();
   return 0;
 }
