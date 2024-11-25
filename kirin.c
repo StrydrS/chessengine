@@ -122,7 +122,7 @@ U64 hashKey;
 int quit = 0;
 int movesToGo = 30;
 int moveTime = -1;
-int time = -1;
+int timer = -1;
 int inc = 0;
 int startTime = 0;
 int stopTime = 0;
@@ -1754,6 +1754,7 @@ int ply;
 
 /************ Transposition Table ************/
 #define hashSize 0x400000
+#define noHashEntry 100000
 #define hashFlagExact 0
 #define hashFlagAlpha 1
 #define hashFlagBeta 2
@@ -1776,6 +1777,37 @@ void clearTranspositionTable() {
   }
 }
 
+static inline int readHashEntry(int alpha, int beta, int depth) { 
+  //create a transposition table instance pointer to point to the hash table entry 
+  //responsible for storing particular hash entry
+  tt *hashEntry = &transpositionTable[hashKey % hashSize];
+  if(hashEntry->key == hashKey) { 
+    if(hashEntry->depth >= depth) {
+      if(hashEntry->flag == hashFlagExact) { 
+        printf("Exact match: \n");
+        return hashEntry->score;
+      }
+      if((hashEntry->flag == hashFlagAlpha) && (hashEntry->score <= alpha)) { 
+        printf("Alpha match: \n");
+        return alpha;
+      }
+      if((hashEntry->flag == hashFlagBeta) && (hashEntry->score >= beta)) { 
+        printf("Beta match: \n");
+        return beta;
+      }
+    }
+  }
+  return noHashEntry;
+}
+
+static inline void recordHash(int score, int depth, int hashFlag) {
+  tt *hashEntry = &transpositionTable[hashKey % hashSize];
+  hashEntry->key = hashKey;
+  hashEntry->depth = depth;
+  hashEntry->flag = hashFlag;
+  hashEntry->score = score;
+  
+}
 static inline void enablePvScoring(moves *moveList) {
   
   followPV = 0; 
@@ -2168,10 +2200,10 @@ void parseGo(char *command)
         inc = atoi(argument + 5);
 
     if ((argument = strstr(command,"wtime")) && side == white)
-        time = atoi(argument + 6);
+        timer = atoi(argument + 6);
 
     if((argument = strstr(command,"btime")) && side == black)
-        time = atoi(argument + 6);
+        timer = atoi(argument + 6);
 
     if((argument = strstr(command,"movestogo")))
         movesToGo = atoi(argument + 10);
@@ -2183,7 +2215,7 @@ void parseGo(char *command)
         depth = atoi(argument + 6);
 
     if(moveTime != -1) {
-        time = moveTime;
+        timer = moveTime;
         movesToGo = 1;
     }
 
@@ -2191,18 +2223,18 @@ void parseGo(char *command)
 
     depth = depth;
 
-    if(time != -1) {
+    if(timer != -1) {
         timeSet = 1;
 
-        time /= movesToGo;
-        time -= 50;
-        stopTime = startTime + time + inc;
+        timer /= movesToGo;
+        timer -= 50;
+        stopTime = startTime + timer + inc;
     }
 
     if(depth == -1) depth = 64;
 
     printf("time:%d start:%d stop:%d depth:%d timeSet:%d\n",
-    time, startTime, stopTime, depth, timeSet);
+    timer, startTime, stopTime, depth, timeSet);
 
     searchPosition(depth);
 }
@@ -2281,6 +2313,9 @@ int main() {
     parseFEN(startPosition);
     printBoard(); 
     clearTranspositionTable();
+    recordHash(45, 1, hashFlagBeta);
+    int score = readHashEntry(20, 30, 1);
+    printf("%d\n", score);
     //searchPosition(7);
     //perftTest(6);
   } else uciLoop();
