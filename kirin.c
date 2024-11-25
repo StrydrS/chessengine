@@ -1687,6 +1687,10 @@ static inline int evaluate() {
 }
 
 /************ Search Position ************/
+//score bounds for range of mating score
+#define infinity 50000
+#define mateValue 49000
+#define mateScore 48000
 /*
                           
     (Victims) Pawn Knight Bishop   Rook  Queen   King
@@ -1783,13 +1787,17 @@ static inline int readHashEntry(int alpha, int beta, int depth) {
   tt *hashEntry = &transpositionTable[hashKey % hashSize];
   if(hashEntry->key == hashKey) { 
     if(hashEntry->depth >= depth) {
+      int score = hashEntry->score;
+      
+      if(score < -mateScore) score += ply;
+      if(score > mateScore) score -= ply;
       if(hashEntry->flag == hashFlagExact) { 
-        return hashEntry->score;
+        return score;
       }
-      if((hashEntry->flag == hashFlagAlpha) && (hashEntry->score <= alpha)) { 
+      if((hashEntry->flag == hashFlagAlpha) && (score <= alpha)) { 
         return alpha;
       }
-      if((hashEntry->flag == hashFlagBeta) && (hashEntry->score >= beta)) { 
+      if((hashEntry->flag == hashFlagBeta) && (score >= beta)) { 
         return beta;
       }
     }
@@ -1799,6 +1807,9 @@ static inline int readHashEntry(int alpha, int beta, int depth) {
 
 static inline void recordHash(int score, int depth, int hashFlag) {
   tt *hashEntry = &transpositionTable[hashKey % hashSize];
+  
+  if(score < -mateScore) score -= ply;
+  if(score > mateScore) score += ply;
   hashEntry->key = hashKey;
   hashEntry->depth = depth;
   hashEntry->flag = hashFlag;
@@ -1945,7 +1956,9 @@ static inline int negamax(int alpha, int beta, int depth) {
   int score;
   int hashFlag = hashFlagAlpha;
 
-  if(ply && (score = readHashEntry(alpha, beta, depth)) != noHashEntry) {
+  int pvNode = (beta - alpha > 1);
+
+  if(ply && (score = readHashEntry(alpha, beta, depth)) != noHashEntry && !pvNode) {
     return score; 
   }
 
@@ -2063,7 +2076,10 @@ static inline int negamax(int alpha, int beta, int depth) {
 
   if(legalMoves == 0) {
     //king is in check
-    if(inCheck) return -49000 + ply;
+    if(inCheck) {
+      return -mateValue + ply;
+    }
+
     else return 0;
   }
 
@@ -2090,8 +2106,8 @@ void searchPosition(int depth) {
 
   //clearTranspositionTable();
 
-  int alpha = -50000;
-  int beta = 50000;
+  int alpha = -infinity;
+  int beta = infinity;
 
   //iterative deepening
   for(int currentDepth = 1; currentDepth <= depth; currentDepth++) { 
@@ -2101,16 +2117,22 @@ void searchPosition(int depth) {
     
     //fell outside of the window, so try again with a full depth window 
     if((score <= alpha) || (score >= beta)) {
-      alpha = -50000;
-      beta = 50000;
+      alpha = -infinity;
+      beta = infinity;
       continue;
     }
     
     //setup the window for the next iteration
     alpha = score - 50;
     beta = score + 50;
-
-    printf("info score cp %d depth %d nodes %ld pv ", score, currentDepth, nodes);
+  
+    if(score > -mateValue && score < -mateScore) {
+      printf("info score mate %d depth %d nodes %ld time %d pv ", -(score + mateValue) / 2 - 1, currentDepth, nodes, getTimeMS() - startTime);
+    } else if(score > mateScore && score < mateValue) {
+      printf("info score mate %d depth %d nodes %ld time %d pv ", (mateValue - score) / 2 + 1, currentDepth, nodes, getTimeMS() - startTime);   
+    } else
+      printf("info score cp %d depth %d nodes %ld time %d pv ", score, currentDepth, nodes, getTimeMS() - startTime);
+        
     for(int i = 0; i < pvLength[0]; i++) {
       printMove(pvTable[0][i]);
       printf(" ");
@@ -2285,9 +2307,10 @@ void uciLoop() {
             continue;
         }
         
-        else if(strncmp(input, "position", 8) == 0)
+        else if(strncmp(input, "position", 8) == 0) { 
             parsePosition(input);
-  
+            clearTranspositionTable();
+        }
         else if(strncmp(input, "ucinewgame", 10) == 0) {
             parsePosition("position startpos");
             clearTranspositionTable();
