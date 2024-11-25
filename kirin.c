@@ -1784,15 +1784,12 @@ static inline int readHashEntry(int alpha, int beta, int depth) {
   if(hashEntry->key == hashKey) { 
     if(hashEntry->depth >= depth) {
       if(hashEntry->flag == hashFlagExact) { 
-        printf("Exact match: \n");
         return hashEntry->score;
       }
       if((hashEntry->flag == hashFlagAlpha) && (hashEntry->score <= alpha)) { 
-        printf("Alpha match: \n");
         return alpha;
       }
       if((hashEntry->flag == hashFlagBeta) && (hashEntry->score >= beta)) { 
-        printf("Beta match: \n");
         return beta;
       }
     }
@@ -1941,6 +1938,12 @@ const int reductionLimit = 3;
 
 //negamax alpha beta search
 static inline int negamax(int alpha, int beta, int depth) { 
+  int score;
+  int hashFlag = hashFlagAlpha;
+
+  if((score = readHashEntry(alpha, beta, depth)) != noHashEntry) {
+    return score; 
+  }
 
   if((nodes & 2047) == 0) communicate();
   pvLength[ply] = ply;
@@ -1960,11 +1963,13 @@ static inline int negamax(int alpha, int beta, int depth) {
   // null move pruning
   if(depth >= 3 && inCheck == 0 && ply) {
     copyBoard();
-    side ^= 1;
+
+    if(enpassant != no_sq) hashKey ^= enpassantKeys[enpassant];
     enpassant = no_sq;
-    
+    side ^= 1;
+    hashKey ^= sideKey;
     //depth - 1 - R where R is the reduction limit
-    int score = -negamax(-beta, -beta + 1, depth - 3);
+    score = -negamax(-beta, -beta + 1, depth - 3);
 
     restoreBoard();
     if(stopped == 1) return 0;
@@ -1993,7 +1998,6 @@ static inline int negamax(int alpha, int beta, int depth) {
 
     //increment legal moves
     legalMoves++;
-    int score;
 
     //score current move
     if(movesSearched == 0) score = -negamax(-beta, -alpha, depth - 1);
@@ -2027,6 +2031,7 @@ static inline int negamax(int alpha, int beta, int depth) {
 
     //fail-hard beta cutoff (node (move) fails high)
     if(score >= beta) { 
+      recordHash(beta, depth, hashFlagBeta);
       if(getCapture(moveList->moves[i]) == 0) { 
         killerMoves[1][ply] = killerMoves[0][ply];
         killerMoves[0][ply] = moveList->moves[i];
@@ -2037,6 +2042,7 @@ static inline int negamax(int alpha, int beta, int depth) {
     }
     //found a better move (PV node)
     if(score > alpha) {
+      hashFlag = hashFlagExact;
       if(getCapture(moveList->moves[i]) == 0) { 
         historyMoves[getPiece(moveList->moves[i])][getTarget(moveList->moves[i])] += depth;
       }
@@ -2057,6 +2063,7 @@ static inline int negamax(int alpha, int beta, int depth) {
     else return 0;
   }
 
+  recordHash(alpha, depth, hashFlag);
  //node fails low
   return alpha;
 
@@ -2076,6 +2083,8 @@ void searchPosition(int depth) {
   memset(historyMoves, 0, sizeof(historyMoves));
   memset(pvTable, 0, sizeof(pvTable));
   memset(pvLength, 0, sizeof(pvLength));
+
+  clearTranspositionTable();
 
   int alpha = -50000;
   int beta = 50000;
@@ -2310,14 +2319,10 @@ int main() {
   int debug = 1;
   
   if(debug) { 
-    parseFEN(startPosition);
+    parseFEN(tricky_position);
     printBoard(); 
-    clearTranspositionTable();
-    recordHash(45, 1, hashFlagBeta);
-    int score = readHashEntry(20, 30, 1);
-    printf("%d\n", score);
-    //searchPosition(7);
-    //perftTest(6);
+    searchPosition(7);
+    //info score cp 20 depth 7 nodes 56762 pv b1c3 d7d5 d2d4 b8c6 g1f3 g8f6 c1f4
   } else uciLoop();
   return 0;
 }
