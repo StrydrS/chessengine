@@ -122,7 +122,7 @@ U64 hashKey;
 int quit = 0;
 int movesToGo = 30;
 int moveTime = -1;
-int timer = -1;
+int time = -1;
 int inc = 0;
 int startTime = 0;
 int stopTime = 0;
@@ -133,9 +133,9 @@ int stopped = 0;
 /************ UCI Time Control Functions from VICE by Richard Allbert ************/
 int getTimeMS() { 
   //get time in ms
-  struct timeval time;
-  gettimeofday(&time, NULL);
-  return time.tv_sec * 1000 + time.tv_usec / 1000;
+  struct timeval timeValue;
+  gettimeofday(&timeValue, NULL);
+  return timeValue.tv_sec * 1000 + timeValue.tv_usec / 1000;
 }
 
 int inputWaiting() {
@@ -2235,10 +2235,10 @@ void parseGo(char *command)
         inc = atoi(argument + 5);
 
     if ((argument = strstr(command,"wtime")) && side == white)
-        timer = atoi(argument + 6);
+        time = atoi(argument + 6);
 
     if((argument = strstr(command,"btime")) && side == black)
-        timer = atoi(argument + 6);
+        time = atoi(argument + 6);
 
     if((argument = strstr(command,"movestogo")))
         movesToGo = atoi(argument + 10);
@@ -2250,7 +2250,7 @@ void parseGo(char *command)
         depth = atoi(argument + 6);
 
     if(moveTime != -1) {
-        timer = moveTime;
+        time = moveTime;
         movesToGo = 1;
     }
 
@@ -2258,18 +2258,15 @@ void parseGo(char *command)
 
     depth = depth;
 
-    if(timer != -1) {
+    if(time != -1) {
         timeSet = 1;
 
-        timer /= movesToGo;
-        timer -= 50;
-        stopTime = startTime + timer + inc;
+        time /= movesToGo;
+        time -= 50;
+        stopTime = startTime + (inc + 1000); //+ inc;
     }
 
     if(depth == -1) depth = 64;
-
-    printf("time:%d start:%d stop:%d depth:%d timeSet:%d\n",
-    timer, startTime, stopTime, depth, timeSet);
 
     searchPosition(depth);
 }
