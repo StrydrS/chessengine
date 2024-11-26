@@ -28,6 +28,7 @@
 #define killer_position "rnbqkb1r/pp1p1pPp/8/2p1pP2/1P1P4/3P3P/P1P1P3/RNBQKBNR w KQkq e6 0 1"
 #define cmk_position "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 "
 #define new_pos "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 "
+#define repetitions "2r3k1/R7/8/1R6/8/8/P4KPP/8 w - - 0 40 "
 
 /************ Board Squares ************/
 enum {
@@ -117,6 +118,9 @@ int castle;
 
 //"almost" unique position identifier -> hash key/position key
 U64 hashKey;
+
+U64 repetitionTable[150];
+int repetitionIndex; 
 
 /************ Time Control Variables ************/
 int quit = 0;
@@ -967,6 +971,8 @@ typedef struct {
   int moves[256]; 
   int count; 
 } moves;
+
+
 
 static inline void addMove(moves *moveList, int move) {
   moveList->moves[moveList->count] = move;
@@ -1902,6 +1908,15 @@ void printMoveScores(moves *moveList) {
   }
 }
 
+static inline int isRepeating() { 
+  for(int i = 0; i < repetitionIndex; i++) { 
+    if(repetitionTable[i] == hashKey) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
 static inline int quiescence(int alpha, int beta) { 
   
   if((nodes & 2047) == 0) communicate();
@@ -1925,15 +1940,20 @@ static inline int quiescence(int alpha, int beta) {
     copyBoard();
     ply++;
     
+    repetitionTable[repetitionIndex] = hashKey;
+    repetitionIndex++;
+
     //if illegal move
     if(makeMove(moveList->moves[i], onlyCaptures) == 0) { 
       ply--;
+      repetitionIndex--;
       continue;
     }
 
        //score current move
     int score = -quiescence(-beta, -alpha);
     ply--;
+    repetitionIndex--;
     restoreBoard();
 
     if(stopped == 1) return 0;
@@ -1957,6 +1977,8 @@ static inline int negamax(int alpha, int beta, int depth) {
   int hashFlag = hashFlagAlpha;
 
   int pvNode = (beta - alpha > 1);
+  
+  if(ply && isRepeating()) return 0;
 
   if(ply && (score = readHashEntry(alpha, beta, depth)) != noHashEntry && !pvNode) {
     return score; 
@@ -1982,6 +2004,9 @@ static inline int negamax(int alpha, int beta, int depth) {
     copyBoard();
     ply++;
 
+    repetitionTable[repetitionIndex] = hashKey;
+    repetitionIndex++;
+
     if(enpassant != no_sq) hashKey ^= enpassantKeys[enpassant];
     enpassant = no_sq;
     side ^= 1;
@@ -1990,6 +2015,7 @@ static inline int negamax(int alpha, int beta, int depth) {
     score = -negamax(-beta, -beta + 1, depth - 3);
     
     ply--;
+    repetitionIndex--;
     restoreBoard();
     if(stopped == 1) return 0;
     if(score >= beta) return beta;
@@ -2009,9 +2035,13 @@ static inline int negamax(int alpha, int beta, int depth) {
     copyBoard();
     ply++;
     
+    repetitionTable[repetitionIndex] = hashKey;
+    repetitionIndex++;
+
     //if illegal move
     if(makeMove(moveList->moves[i], allMoves) == 0) { 
       ply--;
+      repetitionIndex--;
       continue;
     }
 
@@ -2043,6 +2073,7 @@ static inline int negamax(int alpha, int beta, int depth) {
     }
 
     ply--;
+    repetitionIndex--;
     restoreBoard();
 
     if(stopped == 1) return 0;
@@ -2219,58 +2250,71 @@ void parsePosition(char *command) {
   //printBoard();
 }
 
-//parse UCI "go" command, ex. "go depth 6"
-void parseGo(char *command)
-{
-
+void parseGo(char *command) {
     int depth = -1;
     char *argument = NULL;
 
-    if((argument = strstr(command,"infinite"))) {}
+    // Parse UCI inputs
+    if ((argument = strstr(command, "infinite"))) {
+        timeSet = 0;
+        stopTime = -1; // No time limit
+        searchPosition(depth == -1 ? 64 : depth);
+        return;
+    }
+    if ((argument = strstr(command, "movetime"))) moveTime = atoi(argument + 9);
+    if ((argument = strstr(command, "movestogo"))) movesToGo = atoi(argument + 10);
+    if ((argument = strstr(command, "wtime")) && side == white) time = atoi(argument + 6);
+    if ((argument = strstr(command, "btime")) && side == black) time = atoi(argument + 6);
+    if ((argument = strstr(command, "winc")) && side == white) inc = atoi(argument + 5);
+    if ((argument = strstr(command, "binc")) && side == black) inc = atoi(argument + 5);
+    if ((argument = strstr(command, "depth"))) depth = atoi(argument + 6);
 
-    if((argument = strstr(command,"binc")) && side == black)
-        inc = atoi(argument + 5);
-
-    if((argument = strstr(command,"winc")) && side == white)
-        inc = atoi(argument + 5);
-
-    if ((argument = strstr(command,"wtime")) && side == white)
-        time = atoi(argument + 6);
-
-    if((argument = strstr(command,"btime")) && side == black)
-        time = atoi(argument + 6);
-
-    if((argument = strstr(command,"movestogo")))
-        movesToGo = atoi(argument + 10);
-
-    if((argument = strstr(command,"movetime")))
-        moveTime = atoi(argument + 9);
-
-    if((argument = strstr(command,"depth")))
-        depth = atoi(argument + 6);
-
-    if(moveTime != -1) {
+    // Default values if movetime is set
+    if (moveTime != -1) {
         time = moveTime;
         movesToGo = 1;
     }
 
-    startTime = getTimeMS();
-
-    depth = depth;
-
-    if(time != -1) {
+    if (time != -1) {
         timeSet = 1;
 
-        time /= movesToGo;
-        time -= 50;
-        stopTime = startTime + (inc + 1000); //+ inc;
+        // Default moves-to-go if not set
+        if (movesToGo == 0) movesToGo = 30;
+
+        // Calculate time per move
+        int baseTimeForMove = time / movesToGo;
+        int timeForMove = baseTimeForMove + inc - 50; // Add increment, subtract buffer
+
+
+        printf("base time for move: %d\n", baseTimeForMove);
+        printf("time for move: %d\n", timeForMove);
+
+        // Cap time in early game
+        if (moveCount <= 10 && timeForMove > 3000) {
+            timeForMove = 3000; // 3-second cap for early moves
+        }
+
+        // Use increment-only strategy for low base time
+        if (time < 5000) {
+            timeForMove = inc - 50;
+            if (timeForMove < 0) timeForMove = 0; // Safety check
+        }
+
+        // Prevent negative time allocation
+        if (timeForMove < 0) timeForMove = 0;
+
+        // Set stop time
+        startTime = getTimeMS();
+        stopTime = startTime + timeForMove;
+    } else {
+        timeSet = 0;
     }
 
-    if(depth == -1) depth = 64;
+    // Default depth if not specified
+    if (depth == -1) depth = 64;
 
     searchPosition(depth);
 }
-
 // GUI -> isready   
 // readyok <-Engine 
 // GUI -> ucinewgame
@@ -2346,12 +2390,10 @@ int main() {
   int debug = 0;
   
   if(debug) { 
-    parseFEN(startPosition);
+    parseFEN(repetitions);
     printBoard(); 
     searchPosition(10);
     
-    makeMove(pvTable[0][0], allMoves);
-    searchPosition(10);
     //info score cp 20 depth 7 nodes 56762 pv b1c3 d7d5 d2d4 b8c6 g1f3 g8f6 c1f4
   } else uciLoop();
   return 0;
