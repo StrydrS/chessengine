@@ -126,7 +126,7 @@ int repetitionIndex;
 int quit = 0;
 int movesToGo = 30;
 int moveTime = -1;
-int time = -1;
+int timer = -1;
 int inc = 0;
 int startTime = 0;
 int stopTime = 0;
@@ -2249,73 +2249,139 @@ void parsePosition(char *command) {
   }
   //printBoard();
 }
+// reset time control variables
+void reset_time_control()
+{
+    // reset timing
+    quit = 0;
+    movesToGo = 30;
+    moveTime = -1;
+    timer = -1;
+    inc = 0;
+    startTime = 0;
+    stopTime = 0;
+    timeSet = 0;
+    stopped = 0;
+}
 
-void parseGo(char *command) {
+// parse UCI command "go"
+void parseGo(char *command)
+{
+    // reset time control
+    reset_time_control();
+    
+    // init parameters
     int depth = -1;
+
+    // init argument
     char *argument = NULL;
 
-    // Parse UCI inputs
-    if ((argument = strstr(command, "infinite"))) {
-        timeSet = 0;
-        stopTime = -1; // No time limit
-        searchPosition(depth == -1 ? 64 : depth);
+    // infinite search
+    if ((argument = strstr(command,"infinite"))) {}
+
+    // match UCI "binc" command
+    if ((argument = strstr(command,"binc")) && side == black)
+        // parse black time increment
+        inc = atoi(argument + 5);
+
+    // match UCI "winc" command
+    if ((argument = strstr(command,"winc")) && side == white)
+        // parse white time increment
+        inc = atoi(argument + 5);
+
+    // match UCI "wtime" command
+    if ((argument = strstr(command,"wtime")) && side == white)
+        // parse white time limit
+        timer = atoi(argument + 6);
+
+    // match UCI "btime" command
+    if ((argument = strstr(command,"btime")) && side == black)
+        // parse black time limit
+        timer = atoi(argument + 6);
+
+    // match UCI "movestogo" command
+    if ((argument = strstr(command,"movestogo")))
+        // parse number of moves to go
+        movesToGo = atoi(argument + 10);
+
+    // match UCI "movetime" command
+    if ((argument = strstr(command,"movetime")))
+        // parse amount of time allowed to spend to make a move
+        moveTime = atoi(argument + 9);
+
+    // match UCI "depth" command
+    if ((argument = strstr(command,"depth")))
+        // parse search depth
+        depth = atoi(argument + 6);
+    
+    // run perft at given depth
+    if ((argument = strstr(command,"perft"))) {
+        // parse search depth
+        depth = atoi(argument + 6);
+        
+        // run perft
+        perftTest(depth);
+        
         return;
     }
-    if ((argument = strstr(command, "movetime"))) moveTime = atoi(argument + 9);
-    if ((argument = strstr(command, "movestogo"))) movesToGo = atoi(argument + 10);
-    if ((argument = strstr(command, "wtime")) && side == white) time = atoi(argument + 6);
-    if ((argument = strstr(command, "btime")) && side == black) time = atoi(argument + 6);
-    if ((argument = strstr(command, "winc")) && side == white) inc = atoi(argument + 5);
-    if ((argument = strstr(command, "binc")) && side == black) inc = atoi(argument + 5);
-    if ((argument = strstr(command, "depth"))) depth = atoi(argument + 6);
 
-    // Default values if movetime is set
-    if (moveTime != -1) {
-        time = moveTime;
+    // if move time is not available
+    if(moveTime != -1)
+    {
+        // set time equal to move time
+        timer = moveTime;
+
+        // set moves to go to 1
         movesToGo = 1;
     }
 
-    if (time != -1) {
+    // init start time
+    startTime = getTimeMS();
+
+    // init search depth
+    depth = depth;
+
+    // if time control is available
+    if(timer != -1)
+    {
+        // flag we're playing with time control
         timeSet = 1;
 
-        // Default moves-to-go if not set
-        if (movesToGo == 0) movesToGo = 30;
-
-        // Calculate time per move
-        int baseTimeForMove = time / movesToGo;
-        int timeForMove = baseTimeForMove + inc - 50; // Add increment, subtract buffer
-
-
-        printf("base time for move: %d\n", baseTimeForMove);
-        printf("time for move: %d\n", timeForMove);
-
-        // Cap time in early game
-        if (moveCount <= 10 && timeForMove > 3000) {
-            timeForMove = 3000; // 3-second cap for early moves
+        // set up timing
+        timer /= movesToGo;
+        
+        // lag compensation
+        timer -= 50;
+        
+        // if time is up
+        if (timer < 0)
+        {
+            // restore negative time to 0
+            timer = 0;
+            
+            // inc lag compensation on 0+inc time controls
+            inc -= 50;
+            
+            // timing for 0 seconds left and no inc
+            if (inc < 0) inc = 1;
         }
-
-        // Use increment-only strategy for low base time
-        if (time < 5000) {
-            timeForMove = inc - 50;
-            if (timeForMove < 0) timeForMove = 0; // Safety check
-        }
-
-        // Prevent negative time allocation
-        if (timeForMove < 0) timeForMove = 0;
-
-        // Set stop time
-        startTime = getTimeMS();
-        stopTime = startTime + timeForMove;
-    } else {
-        timeSet = 0;
+        
+        // init stoptime
+        stopTime = startTime + timer + inc;        
     }
 
-    // Default depth if not specified
-    if (depth == -1) depth = 64;
+    // if depth is not available
+    if(depth == -1)
+        // set depth to 64 plies (takes ages to complete...)
+        depth = 64;
 
+    // print debug info
+    printf("time: %d  inc: %d  start: %u  stop: %u  depth: %d  timeset:%d\n",
+            timer, inc, startTime, stopTime, depth, timeSet);
+
+    // search position
     searchPosition(depth);
-}
-// GUI -> isready   
+}// GUI -> isready   
 // readyok <-Engine 
 // GUI -> ucinewgame
 // "handshake" protocol within UCI
