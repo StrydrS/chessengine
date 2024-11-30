@@ -119,8 +119,11 @@ int castle;
 //"almost" unique position identifier -> hash key/position key
 U64 hashKey;
 
-U64 repetitionTable[150];
+U64 repetitionTable[1000]; 
 int repetitionIndex; 
+//half move counter
+int ply;
+
 
 /************ Time Control Variables ************/
 int quit = 0;
@@ -341,6 +344,12 @@ void parseFEN(char *fen) {
   side = 0; 
   enpassant = no_sq; 
   castle = 0;
+  
+  hashKey = 0ULL;
+  repetitionIndex = 0;
+  memset(repetitionTable, 0ULL, sizeof(repetitionTable));
+
+  ply = 0;
 
   for(int rank = 0; rank < 8; rank++) {
     for(int file = 0; file < 8; file++) {
@@ -1759,9 +1768,6 @@ int pvTable[maxPly][maxPly];
 
 int followPV, scorePV;
 
-//half move counter
-int ply;
-
 /************ Transposition Table ************/
 #define hashSize 0x400000
 #define noHashEntry 100000
@@ -2238,6 +2244,9 @@ void parsePosition(char *command) {
     while(*currentChar) { 
       int move = parseMove(currentChar);
       if(move == 0) break; 
+      repetitionIndex++;
+      repetitionTable[repetitionIndex] = hashKey;
+
       makeMove(move, allMoves);
 
       //move current char pointer to end of current move
